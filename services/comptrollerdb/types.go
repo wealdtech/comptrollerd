@@ -38,3 +38,32 @@ type BlockPayment struct {
 	FeeRecipientRewards *big.Int
 	ProposerPayments    *big.Int
 }
+
+// ReceivedBid holds information on a bid received by a relay from a builder.
+type ReceivedBid struct {
+	Slot                 uint32
+	Relay                string
+	ParentHash           []byte
+	BlockHash            []byte
+	BuilderPubkey        []byte
+	Timestamp            time.Time
+	ProposerPubkey       []byte
+	ProposerFeeRecipient []byte
+	GasLimit             uint64
+	GasUsed              uint64
+	Value                *big.Int
+}
+
+// DeliveredBid holds information on a bid delivered by a relay to a proposer.
+type DeliveredBid struct {
+	Slot                 uint32
+	Relay                string
+	ParentHash           []byte
+	BlockHash            []byte
+	BuilderPubkey        []byte
+	ProposerPubkey       []byte
+	ProposerFeeRecipient []byte
+	GasLimit             uint64
+	GasUsed              uint64
+	Value                *big.Int
+}

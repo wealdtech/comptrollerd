@@ -27,12 +27,16 @@ import (
 	"strings"
 	"syscall"
 
+	consensusclient "github.com/attestantio/go-eth2-client"
 	relayclient "github.com/attestantio/go-relay-client"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	zerologger "github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	standardbids "github.com/wealdtech/comptrollerd/services/bids/standard"
+	"github.com/wealdtech/comptrollerd/services/chaintime"
+	standardchaintime "github.com/wealdtech/comptrollerd/services/chaintime/standard"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
 	"github.com/wealdtech/comptrollerd/services/metrics"
 	nullmetrics "github.com/wealdtech/comptrollerd/services/metrics/null"
@@ -44,7 +48,7 @@ import (
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.1.0"
+var ReleaseVersion = "0.2.0-dev"
 
 func main() {
 	os.Exit(main2())
@@ -118,6 +122,7 @@ func fetchConfig() error {
 	pflag.String("execclient.address", "", "Address for execution client JSON-RPC endpoint")
 	pflag.Duration("execclient.timeout", 60*time.Second, "Timeout for execution client requests")
 	pflag.Duration("relayclient.timeout", 60*time.Second, "Timeout for relay client requests")
+	pflag.Int64("bids.start-slot", -1, "First slot for which to obtain bids")
 	pflag.Parse()
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		return errors.Wrap(err, "failed to bind pflags to viper")
@@ -143,7 +148,11 @@ func fetchConfig() error {
 	viper.AutomaticEnv()
 
 	// Defaults.
+	viper.SetDefault("timeout", 60*time.Second)
 	viper.SetDefault("process-concurrency", int64(runtime.GOMAXPROCS(-1)))
+	viper.SetDefault("relays.interval", 384*time.Second)
+	viper.SetDefault("bids.interval", 12*time.Second)
+	viper.SetDefault("bids.start-slot", int64(-1))
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -204,9 +213,29 @@ func startServices(ctx context.Context, monitor metrics.Service) error {
 		return errors.Wrap(err, "failed to start scheduler service")
 	}
 
+	consensusClient, err := util.FetchConsensusClient(ctx, viper.GetString("consensusclient.address"))
+	if err != nil {
+		return errors.Wrap(err, "failed to start consensus client")
+	}
+
+	chainTime, err := standardchaintime.New(ctx,
+		standardchaintime.WithLogLevel(util.LogLevel("chaintime")),
+		standardchaintime.WithGenesisTimeProvider(consensusClient.(consensusclient.GenesisTimeProvider)),
+		standardchaintime.WithSpecProvider(consensusClient.(consensusclient.SpecProvider)),
+		standardchaintime.WithForkScheduleProvider(consensusClient.(consensusclient.ForkScheduleProvider)),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start chain time service")
+	}
+
 	log.Trace().Msg("Starting relays service")
-	if err := startRelays(ctx, comptrollerDB, monitor, scheduler); err != nil {
+	if err := startRelays(ctx, comptrollerDB, monitor, scheduler, chainTime); err != nil {
 		return errors.Wrap(err, "failed to start relays service")
+	}
+
+	log.Trace().Msg("Starting bids service")
+	if err := startBids(ctx, comptrollerDB, monitor, scheduler, chainTime); err != nil {
+		return errors.Wrap(err, "failed to start bids service")
 	}
 
 	return nil
@@ -233,6 +262,7 @@ func startRelays(
 	comptrollerDB comptrollerdb.Service,
 	monitor metrics.Service,
 	scheduler scheduler.Service,
+	chainTime chaintime.Service,
 ) error {
 	queuedProposerProviders := make([]relayclient.QueuedProposersProvider, 0)
 	for _, relayAddress := range viper.GetStringSlice("relays.addresses") {
@@ -250,10 +280,54 @@ func startRelays(
 		standardrelays.WithQueuedProposersProviders(queuedProposerProviders),
 		standardrelays.WithValidatorRegistrationsProvider(comptrollerDB.(comptrollerdb.ValidatorRegistrationsProvider)),
 		standardrelays.WithValidatorRegistrationsSetter(comptrollerDB.(comptrollerdb.ValidatorRegistrationsSetter)),
-		standardrelays.WithInterval(12*time.Second),
+		standardrelays.WithInterval(viper.GetDuration("relays.interval")),
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create relays service")
+	}
+
+	return nil
+}
+
+func startBids(
+	ctx context.Context,
+	comptrollerDB comptrollerdb.Service,
+	monitor metrics.Service,
+	scheduler scheduler.Service,
+	chainTime chaintime.Service,
+) error {
+	receivedBidTracesProviders := make([]relayclient.ReceivedBidTracesProvider, 0)
+	for _, relayAddress := range viper.GetStringSlice("bids.addresses") {
+		relayClient, err := util.FetchRelayClient(ctx, relayAddress)
+		if err != nil {
+			log.Error().Str("address", relayAddress).Err(err).Msg("Failed to instantiate relay client; skipping")
+			continue
+		}
+		receivedBidTracesProviders = append(receivedBidTracesProviders, relayClient.(relayclient.ReceivedBidTracesProvider))
+	}
+	deliveredBidTraceProviders := make([]relayclient.DeliveredBidTraceProvider, 0)
+	for _, relayAddress := range viper.GetStringSlice("bids.addresses") {
+		relayClient, err := util.FetchRelayClient(ctx, relayAddress)
+		if err != nil {
+			log.Error().Str("address", relayAddress).Err(err).Msg("Failed to instantiate relay client; skipping")
+			continue
+		}
+		deliveredBidTraceProviders = append(deliveredBidTraceProviders, relayClient.(relayclient.DeliveredBidTraceProvider))
+	}
+	_, err := standardbids.New(ctx,
+		standardbids.WithLogLevel(util.LogLevel("bids")),
+		standardbids.WithMonitor(monitor),
+		standardbids.WithScheduler(scheduler),
+		standardbids.WithChainTime(chainTime),
+		standardbids.WithDeliveredBidTraceProviders(deliveredBidTraceProviders),
+		standardbids.WithReceivedBidTracesProviders(receivedBidTracesProviders),
+		standardbids.WithDeliveredBidsSetter(comptrollerDB.(comptrollerdb.DeliveredBidsSetter)),
+		standardbids.WithReceivedBidsSetter(comptrollerDB.(comptrollerdb.ReceivedBidsSetter)),
+		standardbids.WithInterval(viper.GetDuration("bids.interval")),
+		standardbids.WithStartSlot(viper.GetInt64("bids.start-slot")),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to create bids service")
 	}
 
 	return nil

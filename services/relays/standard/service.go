@@ -90,19 +90,23 @@ func (s *Service) updateOnScheduleTick(ctx context.Context, data interface{}) {
 	}
 	defer s.activitySem.Release(1)
 
-	for _, queuedProposersProvider := range s.queuedProposersProviders {
-		log := log.With().Str("relay", queuedProposersProvider.Address()).Logger()
-		queuedProposers, err := queuedProposersProvider.QueuedProposers(ctx)
+	s.updateQueuedProposersProviders(ctx)
+}
+
+func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
+	for _, provider := range s.queuedProposersProviders {
+		log := log.With().Str("relay", provider.Address()).Logger()
+		proposers, err := provider.QueuedProposers(ctx)
 		if err != nil {
 			log.Warn().Err(err).Msg("Failed to obtain queued proposers for update")
 			continue
 		}
 
-		for _, queuedProposer := range queuedProposers {
-			slot := uint32(queuedProposer.Slot)
+		for _, proposer := range proposers {
+			slot := uint32(proposer.Slot)
 			// See if we already have this in the database.
 			filter := &comptrollerdb.ValidatorRegistrationFilter{
-				Relays:   []string{queuedProposersProvider.Address()},
+				Relays:   []string{provider.Address()},
 				FromSlot: &slot,
 				ToSlot:   &slot,
 			}
@@ -112,38 +116,39 @@ func (s *Service) updateOnScheduleTick(ctx context.Context, data interface{}) {
 				// Continue as we may fix the error with an update.
 			}
 			if len(registrations) == 1 &&
-				bytes.Equal(registrations[0].FeeRecipient, queuedProposer.Entry.Message.FeeRecipient[:]) &&
-				registrations[0].GasLimit == queuedProposer.Entry.Message.GasLimit {
+				bytes.Equal(registrations[0].FeeRecipient, proposer.Entry.Message.FeeRecipient[:]) &&
+				registrations[0].GasLimit == proposer.Entry.Message.GasLimit {
 				log.Trace().Uint32("slot", slot).Str("fee_recipient", fmt.Sprintf("%#x", registrations[0].FeeRecipient)).Uint64("gas_limit", registrations[0].GasLimit).Msg("Duplicate; ignoring")
+				monitorRegistrationsProcessed(provider.Address())
 				continue
-			} else {
-				ctx, cancel, err := s.validatorRegistrationsSetter.BeginTx(ctx)
-				if err != nil {
-					log.Error().Err(err).Msg("Failed to begin transaction")
-					continue
-				}
-
-				if err := s.validatorRegistrationsSetter.SetValidatorRegistration(ctx, &comptrollerdb.ValidatorRegistration{
-					Slot:            slot,
-					Relay:           queuedProposersProvider.Address(),
-					ValidatorPubkey: queuedProposer.Entry.Message.Pubkey[:],
-					FeeRecipient:    queuedProposer.Entry.Message.FeeRecipient[:],
-					GasLimit:        queuedProposer.Entry.Message.GasLimit,
-					Timestamp:       queuedProposer.Entry.Message.Timestamp,
-					Signature:       queuedProposer.Entry.Signature[:],
-				}); err != nil {
-					cancel()
-					log.Error().Err(err).Msg("Failed to set validator registration")
-					continue
-				}
-				if err := s.validatorRegistrationsSetter.CommitTx(ctx); err != nil {
-					cancel()
-					log.Error().Err(err).Msg("Failed to commit transaction")
-					continue
-				}
-				log.Trace().Str("relay", queuedProposersProvider.Address()).Uint64("slot", uint64(queuedProposer.Slot)).Str("pubkey", fmt.Sprintf("%#x", queuedProposer.Entry.Message.Pubkey)).Str("fee_recipient", fmt.Sprintf("%#x", queuedProposer.Entry.Message.FeeRecipient)).Msg("Stored validator registration")
 			}
-			monitorRegistrationsProcessed(queuedProposersProvider.Address())
+
+			ctx, cancel, err := s.validatorRegistrationsSetter.BeginTx(ctx)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to begin transaction")
+				continue
+			}
+
+			if err := s.validatorRegistrationsSetter.SetValidatorRegistration(ctx, &comptrollerdb.ValidatorRegistration{
+				Slot:            slot,
+				Relay:           provider.Address(),
+				ValidatorPubkey: proposer.Entry.Message.Pubkey[:],
+				FeeRecipient:    proposer.Entry.Message.FeeRecipient[:],
+				GasLimit:        proposer.Entry.Message.GasLimit,
+				Timestamp:       proposer.Entry.Message.Timestamp,
+				Signature:       proposer.Entry.Signature[:],
+			}); err != nil {
+				cancel()
+				log.Error().Err(err).Msg("Failed to set validator registration")
+				continue
+			}
+			if err := s.validatorRegistrationsSetter.CommitTx(ctx); err != nil {
+				cancel()
+				log.Error().Err(err).Msg("Failed to commit transaction")
+				continue
+			}
+			log.Trace().Str("relay", provider.Address()).Uint64("slot", uint64(proposer.Slot)).Str("pubkey", fmt.Sprintf("%#x", proposer.Entry.Message.Pubkey)).Str("fee_recipient", fmt.Sprintf("%#x", proposer.Entry.Message.FeeRecipient)).Msg("Stored validator registration")
+			monitorRegistrationsProcessed(provider.Address())
 		}
 	}
 }

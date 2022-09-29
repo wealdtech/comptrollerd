@@ -237,6 +237,37 @@ CREATE TABLE t_block_payments (
  ,f_proposer_payments     NUMERIC
 );
 CREATE UNIQUE INDEX i_block_payments_1 ON t_block_payments(f_height,f_hash);
+
+-- t_received_bids contains information about bids received by relays.
+CREATE TABLE t_received_bids (
+  f_slot                   BIGINT NOT NULL
+ ,f_relay                  TEXT NOT NULL
+ ,f_parent_hash            BYTEA NOT NULL
+ ,f_block_hash             BYTEA NOT NULL
+ ,f_builder_pubkey         BYTEA NOT NULL
+ ,f_timestamp              TIMESTAMPTZ NOT NULL
+ ,f_proposer_pubkey        BYTEA NOT NULL
+ ,f_proposer_fee_recipient BYTEA NOT NULL
+ ,f_gas_limit              BIGINT NOT NULL
+ ,f_gas_used               BIGINT NOT NULL
+ ,f_value                  NUMERIC NOT NULL
+);
+CREATE UNIQUE INDEX i_received_bids_1 ON t_received_bids(f_slot,f_relay,f_parent_hash,f_block_hash,f_builder_pubkey,f_timestamp);
+
+-- t_delivered_bids contains information about bids delivered by relays.
+CREATE TABLE t_delivered_bids (
+  f_slot                   BIGINT NOT NULL
+ ,f_relay                  TEXT NOT NULL
+ ,f_parent_hash            BYTEA NOT NULL
+ ,f_block_hash             BYTEA NOT NULL
+ ,f_builder_pubkey         BYTEA NOT NULL
+ ,f_proposer_pubkey        BYTEA NOT NULL
+ ,f_proposer_fee_recipient BYTEA NOT NULL
+ ,f_gas_limit              BIGINT NOT NULL
+ ,f_gas_used               BIGINT NOT NULL
+ ,f_value                  NUMERIC NOT NULL
+);
+CREATE UNIQUE INDEX i_delivered_bids_1 ON t_delivered_bids(f_slot,f_relay,f_parent_hash,f_block_hash,f_builder_pubkey);
 `); err != nil {
 		cancel()
 		return errors.Wrap(err, "failed to create initial tables")

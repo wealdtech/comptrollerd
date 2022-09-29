@@ -84,3 +84,81 @@ type ValidatorRegistrationFilter struct {
 	// If nil then there is no fee recipient filter.
 	FeeRecipients [][]byte
 }
+
+// ReceivedBidFilter defines a filter for fetching received bids.
+// Filter elements are ANDed together.
+// Results are always returned in ascending slot order.
+type ReceivedBidFilter struct {
+	// Limit is the maximum number of bids to return.
+	// If nil then there is no limit.
+	Limit *uint32
+
+	// Order is either OrderEarliest, in which case the earliest results
+	// that match the filter are returned, or OrderLatest, in which case the
+	// latest results that match the filter are returned.
+	// The default is OrderEarliest.
+	Order Order
+
+	// Relay is the address of the relays to fetch.
+	// If nil then there is no relay filter.
+	Relays []string
+
+	// FromSlot is the earliest slot from which to fetch bids.
+	// If nil then there is no earliest slot.
+	FromSlot *uint32
+
+	// ToSlot is the latest slot to which to fetch bids.
+	// If nil then there is no latest slot.
+	ToSlot *uint32
+
+	// BuilderPubkeys are the builder public keys of the bids.
+	// If nil then there is no builder public key filter.
+	BuilderPubkeys [][]byte
+
+	// ProposerPubkeys are the proposer public keys of the bids.
+	// If nil then there is no proposer public key filter.
+	ProposerPubkeys [][]byte
+
+	// ProposerFeeRecipients are the proposer fee recipients of the bids.
+	// If nil then there is no proposer fee recipient filter.
+	ProposerFeeRecipients [][]byte
+}
+
+// DeliveredBidFilter defines a filter for fetching delivered bids.
+// Filter elements are ANDed together.
+// Results are always returned in ascending slot order.
+type DeliveredBidFilter struct {
+	// Limit is the maximum number of bids to return.
+	// If nil then there is no limit.
+	Limit *uint32
+
+	// Order is either OrderEarliest, in which case the earliest results
+	// that match the filter are returned, or OrderLatest, in which case the
+	// latest results that match the filter are returned.
+	// The default is OrderEarliest.
+	Order Order
+
+	// Relay is the address of the relays to fetch.
+	// If nil then there is no relay filter.
+	Relays []string
+
+	// FromSlot is the earliest slot from which to fetch bids.
+	// If nil then there is no earliest slot.
+	FromSlot *uint32
+
+	// ToSlot is the latest slot to which to fetch bids.
+	// If nil then there is no latest slot.
+	ToSlot *uint32
+
+	// BuilderPubkeys are the builder public keys of the bids.
+	// If nil then there is no builder public key filter.
+	BuilderPubkeys [][]byte
+
+	// ProposerPubkeys are the proposer public keys of the bids.
+	// If nil then there is no proposer public key filter.
+	ProposerPubkeys [][]byte
+
+	// ProposerFeeRecipients are the proposer fee recipients of the bids.
+	// If nil then there is no proposer fee recipient filter.
+	ProposerFeeRecipients [][]byte
+}

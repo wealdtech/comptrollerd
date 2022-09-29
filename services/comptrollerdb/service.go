@@ -46,8 +46,42 @@ type BlockPaymentsSetter interface {
 	SetBlockPayment(ctx context.Context, payment *BlockPayment) error
 }
 
+// ReceivedBidsProvider defines functions to provide received bids.
+type ReceivedBidsProvider interface {
+	Service
+
+	// ReceivedBids returns received bids matching the supplied filter.
+	ReceivedBids(ctx context.Context, filter *ReceivedBidFilter) ([]*ReceivedBid, error)
+}
+
+// ReceivedBidsSetter defines functions to create and update received bids.
+type ReceivedBidsSetter interface {
+	Service
+
+	// SetReceivedBid sets a bid trace.
+	SetReceivedBid(ctx context.Context, bid *ReceivedBid) error
+}
+
+// DeliveredBidsProvider defines functions to provide delivered bids.
+type DeliveredBidsProvider interface {
+	Service
+
+	// DeliveredBids returns delivered bids matching the supplied filter.
+	DeliveredBids(ctx context.Context, filter *DeliveredBidFilter) ([]*DeliveredBid, error)
+}
+
+// DeliveredBidsSetter defines functions to create and update delivered bids.
+type DeliveredBidsSetter interface {
+	Service
+
+	// SetDeliveredBid sets a bid delivered by a relay.
+	SetDeliveredBid(ctx context.Context, bid *DeliveredBid) error
+}
+
 // ValidatorRegistrationsProvider defines functions to provide validator registration information.
 type ValidatorRegistrationsProvider interface {
+	Service
+
 	// ValidatorRegistrations returns validator registrations matching the supplied filter.
 	ValidatorRegistrations(ctx context.Context, filter *ValidatorRegistrationFilter) ([]*ValidatorRegistration, error)
 }
