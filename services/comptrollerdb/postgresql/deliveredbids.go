@@ -114,8 +114,8 @@ ORDER BY f_slot DESC,f_relay DESC,f_parent_hash DESC,f_block_hash DESC,f_builder
 		return nil, errors.New("no order specified")
 	}
 
-	if filter.Limit != nil {
-		queryVals = append(queryVals, *filter.Limit)
+	if filter.Limit != 0 {
+		queryVals = append(queryVals, filter.Limit)
 		queryBuilder.WriteString(fmt.Sprintf(`
 LIMIT $%d`, len(queryVals)))
 	}

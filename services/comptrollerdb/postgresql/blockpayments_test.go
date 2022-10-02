@@ -79,7 +79,7 @@ func TestBlockPayments(t *testing.T) {
 		{
 			name: "SinglePayment",
 			filter: &comptrollerdb.BlockPaymentFilter{
-				Limit:      uint32Ptr(1),
+				Limit:      1,
 				Order:      comptrollerdb.OrderEarliest,
 				FromHeight: uint32Ptr(12346),
 				ToHeight:   uint32Ptr(12346),

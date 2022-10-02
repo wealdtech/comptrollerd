@@ -83,7 +83,7 @@ func TestValidatorRegistrations(t *testing.T) {
 		{
 			name: "SingleRegistration",
 			filter: &comptrollerdb.ValidatorRegistrationFilter{
-				Limit:    uint32Ptr(1),
+				Limit:    1,
 				Order:    comptrollerdb.OrderEarliest,
 				FromSlot: uint32Ptr(111),
 				ToSlot:   uint32Ptr(111),

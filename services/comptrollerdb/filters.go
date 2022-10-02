@@ -28,8 +28,8 @@ const (
 // Results are always returned in ascending block height order.
 type BlockPaymentFilter struct {
 	// Limit is the maximum number of blocks to return.
-	// If nil then there is no limit.
-	Limit *uint32
+	// If 0 then there is no limit.
+	Limit uint32
 
 	// Order is either OrderEarliest, in which case the earliest results
 	// that match the filter are returned, or OrderLatest, in which case the
@@ -55,8 +55,8 @@ type BlockPaymentFilter struct {
 // Results are always returned in ascending block height order.
 type ValidatorRegistrationFilter struct {
 	// Limit is the maximum number of blocks to return.
-	// If nil then there is no limit.
-	Limit *uint32
+	// If 0 then there is no limit.
+	Limit uint32
 
 	// Order is either OrderEarliest, in which case the earliest results
 	// that match the filter are returned, or OrderLatest, in which case the
@@ -90,8 +90,8 @@ type ValidatorRegistrationFilter struct {
 // Results are always returned in ascending slot order.
 type ReceivedBidFilter struct {
 	// Limit is the maximum number of bids to return.
-	// If nil then there is no limit.
-	Limit *uint32
+	// If 0 then there is no limit.
+	Limit uint32
 
 	// Order is either OrderEarliest, in which case the earliest results
 	// that match the filter are returned, or OrderLatest, in which case the
@@ -129,8 +129,8 @@ type ReceivedBidFilter struct {
 // Results are always returned in ascending slot order.
 type DeliveredBidFilter struct {
 	// Limit is the maximum number of bids to return.
-	// If nil then there is no limit.
-	Limit *uint32
+	// If 0 then there is no limit.
+	Limit uint32
 
 	// Order is either OrderEarliest, in which case the earliest results
 	// that match the filter are returned, or OrderLatest, in which case the
