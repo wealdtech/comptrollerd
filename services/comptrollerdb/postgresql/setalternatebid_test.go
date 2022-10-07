@@ -25,7 +25,7 @@ import (
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb/postgresql"
 )
 
-func TestSetBlockPayment(t *testing.T) {
+func TestSetAlternateBid(t *testing.T) {
 	ctx := context.Background()
 	s, err := postgresql.New(ctx,
 		postgresql.WithLogLevel(zerolog.Disabled),
@@ -37,46 +37,22 @@ func TestSetBlockPayment(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name    string
-		payment *comptrollerdb.BlockPayment
-		err     string
+		name string
+		bid  *comptrollerdb.AlternateBid
+		err  string
 	}{
 		{
 			name: "Nil",
-			err:  "payment nil",
+			err:  "alternate bid nil",
 		},
 		{
 			name: "Good",
-			payment: &comptrollerdb.BlockPayment{
-				Height:               12345,
-				Hash:                 byteArray("0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-				Slot:                 1234,
-				ProposerFeeRecipient: byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
-				ProposerPayment:      big.NewInt(11111111),
-			},
-		},
-		{
-			name: "GoodProposerExpectedPayment",
-			payment: &comptrollerdb.BlockPayment{
-				Height:                  12345,
-				Hash:                    byteArray("0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-				Slot:                    1234,
-				ProposerFeeRecipient:    byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
-				ProposerExpectedPayment: big.NewInt(11111111),
-				ProposerPayment:         big.NewInt(11111111),
-			},
-		},
-		{
-			name: "GoodSeparateBuilder",
-			payment: &comptrollerdb.BlockPayment{
-				Height:                  12345,
-				Hash:                    byteArray("0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-				Slot:                    1234,
-				ProposerFeeRecipient:    byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
-				ProposerExpectedPayment: big.NewInt(11111111),
-				ProposerPayment:         big.NewInt(11111111),
-				BuilderFeeRecipient:     byteArray("0x202122232425262728292a2b2c2d2e2f30313233"),
-				BuilderPayment:          big.NewInt(22222222),
+			bid: &comptrollerdb.AlternateBid{
+				Slot:          1234,
+				SelectedRelay: "Relay 1",
+				SelectedValue: big.NewInt(1000000),
+				BestRelay:     "Relay 2",
+				BestValue:     big.NewInt(2000000),
 			},
 		},
 	}
@@ -87,7 +63,7 @@ func TestSetBlockPayment(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := s.SetBlockPayment(ctx, test.payment)
+			err := s.SetAlternateBid(ctx, test.bid)
 			if test.err != "" {
 				require.NotNil(t, err)
 				require.EqualError(t, err, test.err)

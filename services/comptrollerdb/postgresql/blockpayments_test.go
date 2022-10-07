@@ -42,31 +42,33 @@ func TestBlockPayments(t *testing.T) {
 	defer cancel()
 
 	payment1 := &comptrollerdb.BlockPayment{
-		Height:              12345,
-		Hash:                byteArray("0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-		Slot:                1234,
-		FeeRecipient:        byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
-		FeeRecipientRewards: big.NewInt(22222222),
-		ProposerPayments:    big.NewInt(11111111),
+		Height:               12345,
+		Hash:                 byteArray("0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
+		Slot:                 1234,
+		ProposerFeeRecipient: byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
+		ProposerPayment:      big.NewInt(11111111),
 	}
 	require.NoError(t, s.SetBlockPayment(ctx, payment1))
 
 	payment2 := &comptrollerdb.BlockPayment{
-		Height:              12346,
-		Hash:                byteArray("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"),
-		Slot:                1236,
-		FeeRecipient:        byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
-		FeeRecipientRewards: big.NewInt(22222222),
+		Height:                  12346,
+		Hash:                    byteArray("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"),
+		Slot:                    1236,
+		ProposerFeeRecipient:    byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
+		ProposerExpectedPayment: big.NewInt(11111111),
+		ProposerPayment:         big.NewInt(11111111),
 	}
 	require.NoError(t, s.SetBlockPayment(ctx, payment2))
 
 	payment3 := &comptrollerdb.BlockPayment{
-		Height:              12347,
-		Hash:                byteArray("0x02030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021"),
-		Slot:                1240,
-		FeeRecipient:        byteArray("0x0102030405060708090a0b0c0d0e0f1011121314"),
-		FeeRecipientRewards: big.NewInt(22222222),
-		ProposerPayments:    big.NewInt(22222222),
+		Height:                  12347,
+		Hash:                    byteArray("0x02030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021"),
+		Slot:                    1240,
+		ProposerFeeRecipient:    byteArray("0x000102030405060708090a0b0c0d0e0f10111213"),
+		ProposerExpectedPayment: big.NewInt(11111111),
+		ProposerPayment:         big.NewInt(11111111),
+		BuilderFeeRecipient:     byteArray("0x202122232425262728292a2b2c2d2e2f30313233"),
+		BuilderPayment:          big.NewInt(22222222),
 	}
 	require.NoError(t, s.SetBlockPayment(ctx, payment3))
 
@@ -84,7 +86,7 @@ func TestBlockPayments(t *testing.T) {
 				FromHeight: uint32Ptr(12346),
 				ToHeight:   uint32Ptr(12346),
 			},
-			payments: `[{"Height":12346,"Hash":"AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=","Slot":1236,"FeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","FeeRecipientRewards":22222222,"ProposerPayments":null}]`,
+			payments: `[{"Height":12346,"Hash":"AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=","Slot":1236,"ProposerFeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","ProposerExpectedPayment":11111111,"ProposerPayment":11111111,"BuilderFeeRecipient":null,"BuilderPayment":null}]`,
 		},
 		{
 			name: "RangePayments",
@@ -93,17 +95,7 @@ func TestBlockPayments(t *testing.T) {
 				FromHeight: uint32Ptr(12345),
 				ToHeight:   uint32Ptr(12347),
 			},
-			payments: `[{"Height":12345,"Hash":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=","Slot":1234,"FeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","FeeRecipientRewards":22222222,"ProposerPayments":11111111},{"Height":12346,"Hash":"AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=","Slot":1236,"FeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","FeeRecipientRewards":22222222,"ProposerPayments":null},{"Height":12347,"Hash":"AgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICE=","Slot":1240,"FeeRecipient":"AQIDBAUGBwgJCgsMDQ4PEBESExQ=","FeeRecipientRewards":22222222,"ProposerPayments":22222222}]`,
-		},
-		{
-			name: "FeeRecipient",
-			filter: &comptrollerdb.BlockPaymentFilter{
-				Order: comptrollerdb.OrderEarliest,
-				FeeRecipients: [][]byte{
-					byteArray("0x0102030405060708090a0b0c0d0e0f1011121314"),
-				},
-			},
-			payments: `[{"Height":12347,"Hash":"AgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICE=","Slot":1240,"FeeRecipient":"AQIDBAUGBwgJCgsMDQ4PEBESExQ=","FeeRecipientRewards":22222222,"ProposerPayments":22222222}]`,
+			payments: `[{"Height":12345,"Hash":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=","Slot":1234,"ProposerFeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","ProposerExpectedPayment":null,"ProposerPayment":11111111,"BuilderFeeRecipient":null,"BuilderPayment":null},{"Height":12346,"Hash":"AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=","Slot":1236,"ProposerFeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","ProposerExpectedPayment":11111111,"ProposerPayment":11111111,"BuilderFeeRecipient":null,"BuilderPayment":null},{"Height":12347,"Hash":"AgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICE=","Slot":1240,"ProposerFeeRecipient":"AAECAwQFBgcICQoLDA0ODxAREhM=","ProposerExpectedPayment":11111111,"ProposerPayment":11111111,"BuilderFeeRecipient":"ICEiIyQlJicoKSorLC0uLzAxMjM=","BuilderPayment":22222222}]`,
 		},
 	}
 

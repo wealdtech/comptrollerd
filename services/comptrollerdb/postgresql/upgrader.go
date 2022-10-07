@@ -227,14 +227,26 @@ CREATE TABLE t_validator_registrations (
 );
 CREATE UNIQUE INDEX i_validator_registrations_1 ON t_validator_registrations(f_slot,f_relay,f_validator_pubkey);
 
+-- t_alternate_bids contains information about alternate bids a proposer could have taken.
+CREATE TABLE t_alternate_bids (
+  f_slot           BIGINT NOT NULL
+ ,f_selected_relay TEXT NOT NULL
+ ,f_selected_value NUMERIC NOT NULL
+ ,f_best_relay     TEXT NOT NULL
+ ,f_best_value     NUMERIC NOT NULL
+);
+CREATE UNIQUE INDEX i_alternate_bids_1 ON t_alternate_bids(f_slot,f_selected_relay);
+
 -- t_block_payments contains information about the payments made in a block.
 CREATE TABLE t_block_payments (
-  f_height                BIGINT NOT NULL
- ,f_hash                  BYTEA NOT NULL
- ,f_slot                  BIGINT NOT NULL
- ,f_fee_recipient         BYTEA NOT NULL
- ,f_fee_recipient_rewards NUMERIC NOT NULL
- ,f_proposer_payments     NUMERIC
+  f_height                    BIGINT NOT NULL
+ ,f_hash                      BYTEA NOT NULL
+ ,f_slot                      BIGINT NOT NULL
+ ,f_proposer_fee_recipient    BYTEA NOT NULL
+ ,f_proposer_expected_payment NUMERIC
+ ,f_proposer_payment          NUMERIC NOT NULL
+ ,f_builder_fee_recipient     BYTEA
+ ,f_builder_payment           NUMERIC
 );
 CREATE UNIQUE INDEX i_block_payments_1 ON t_block_payments(f_height,f_hash);
 

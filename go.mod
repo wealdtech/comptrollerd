@@ -7,7 +7,6 @@ require (
 	github.com/attestantio/go-execution-client v0.7.5
 	github.com/attestantio/go-relay-client v0.2.1
 	github.com/aws/aws-sdk-go v1.44.81
-	github.com/holiman/uint256 v1.2.0
 	github.com/jackc/pgtype v1.12.0
 	github.com/jackc/pgx/v4 v4.17.2
 	github.com/mitchellh/go-homedir v1.1.0
@@ -20,7 +19,7 @@ require (
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.8.0
 	github.com/wealdtech/chaind v0.6.12
-	github.com/wealdtech/execd v0.4.7
+	github.com/wealdtech/execd v0.4.9
 	github.com/wealdtech/go-majordomo v1.1.0
 	go.uber.org/atomic v1.9.0
 	golang.org/x/sync v0.0.0-20220907140024-f12130a52804
@@ -46,6 +45,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.13.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect

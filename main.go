@@ -34,7 +34,9 @@ import (
 	zerologger "github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/wealdtech/comptrollerd/services/bids"
 	standardbids "github.com/wealdtech/comptrollerd/services/bids/standard"
+	standardblockpayments "github.com/wealdtech/comptrollerd/services/blockpayments/standard"
 	"github.com/wealdtech/comptrollerd/services/chaintime"
 	standardchaintime "github.com/wealdtech/comptrollerd/services/chaintime/standard"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
@@ -45,10 +47,11 @@ import (
 	"github.com/wealdtech/comptrollerd/services/scheduler"
 	standardscheduler "github.com/wealdtech/comptrollerd/services/scheduler/standard"
 	"github.com/wealdtech/comptrollerd/util"
+	"github.com/wealdtech/execd/services/execdb"
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.2.0-dev"
+var ReleaseVersion = "0.2.0"
 
 func main() {
 	os.Exit(main2())
@@ -119,10 +122,9 @@ func fetchConfig() error {
 	pflag.String("log-file", "", "redirect log output to a file")
 	pflag.String("profile-address", "", "Address on which to run Go profile server")
 	pflag.String("tracing-address", "", "Address to which to send tracing data")
-	pflag.String("execclient.address", "", "Address for execution client JSON-RPC endpoint")
-	pflag.Duration("execclient.timeout", 60*time.Second, "Timeout for execution client requests")
 	pflag.Duration("relayclient.timeout", 60*time.Second, "Timeout for relay client requests")
-	pflag.Int64("bids.start-slot", -1, "First slot for which to obtain bids")
+	pflag.Int64("bids.start-slot", -1, "First slot for which to obtain or re-obtain bids")
+	pflag.Int64("blockpayments.start-slot", -1, "First slot for which to calculate or re-calculate block payments")
 	pflag.Parse()
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		return errors.Wrap(err, "failed to bind pflags to viper")
@@ -152,7 +154,7 @@ func fetchConfig() error {
 	viper.SetDefault("process-concurrency", int64(runtime.GOMAXPROCS(-1)))
 	viper.SetDefault("relays.interval", 384*time.Second)
 	viper.SetDefault("bids.interval", 12*time.Second)
-	viper.SetDefault("bids.start-slot", int64(-1))
+	viper.SetDefault("blockpayments.track-distance", 96)
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -194,7 +196,6 @@ func startServices(ctx context.Context, monitor metrics.Service) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to start execution database")
 	}
-	log.Trace().Str("db", fmt.Sprintf("%v", execDB)).Msg("Exec DB")
 
 	comptrollerDB, err := util.InitComptrollerDB(ctx, majordomo)
 	if err != nil {
@@ -234,7 +235,7 @@ func startServices(ctx context.Context, monitor metrics.Service) error {
 	}
 
 	log.Trace().Msg("Starting bids service")
-	if err := startBids(ctx, comptrollerDB, monitor, scheduler, chainTime); err != nil {
+	if err := startBids(ctx, comptrollerDB, monitor, scheduler, chainTime, execDB); err != nil {
 		return errors.Wrap(err, "failed to start bids service")
 	}
 
@@ -295,7 +296,27 @@ func startBids(
 	monitor metrics.Service,
 	scheduler scheduler.Service,
 	chainTime chaintime.Service,
+	execDB execdb.Service,
 ) error {
+	blockPayments, err := standardblockpayments.New(ctx,
+		standardblockpayments.WithLogLevel(util.LogLevel("blockpayments")),
+		standardblockpayments.WithMonitor(monitor),
+		standardblockpayments.WithChainTime(chainTime),
+		standardblockpayments.WithReceivedBidsProvider(comptrollerDB.(comptrollerdb.ReceivedBidsProvider)),
+		standardblockpayments.WithDeliveredBidsProvider(comptrollerDB.(comptrollerdb.DeliveredBidsProvider)),
+		standardblockpayments.WithBlockPaymentsSetter(comptrollerDB.(comptrollerdb.BlockPaymentsSetter)),
+		standardblockpayments.WithAlternateBidsSetter(comptrollerDB.(comptrollerdb.AlternateBidsSetter)),
+		standardblockpayments.WithBlocksProvider(execDB.(execdb.BlocksProvider)),
+		standardblockpayments.WithBalancesProvider(execDB.(execdb.BalancesProvider)),
+		standardblockpayments.WithTransactionsProvider(execDB.(execdb.TransactionsProvider)),
+		standardblockpayments.WithTransactionBalanceChangesProvider(execDB.(execdb.TransactionBalanceChangesProvider)),
+		standardblockpayments.WithTrackDistance(viper.GetUint32("blockpayments.track-distance")),
+		standardblockpayments.WithStartSlot(viper.GetInt64("blockpayments.start-slot")),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to create block payments service")
+	}
+
 	receivedBidTracesProviders := make([]relayclient.ReceivedBidTracesProvider, 0)
 	for _, relayAddress := range viper.GetStringSlice("bids.addresses") {
 		relayClient, err := util.FetchRelayClient(ctx, relayAddress)
@@ -314,7 +335,7 @@ func startBids(
 		}
 		deliveredBidTraceProviders = append(deliveredBidTraceProviders, relayClient.(relayclient.DeliveredBidTraceProvider))
 	}
-	_, err := standardbids.New(ctx,
+	if _, err := standardbids.New(ctx,
 		standardbids.WithLogLevel(util.LogLevel("bids")),
 		standardbids.WithMonitor(monitor),
 		standardbids.WithScheduler(scheduler),
@@ -323,10 +344,10 @@ func startBids(
 		standardbids.WithReceivedBidTracesProviders(receivedBidTracesProviders),
 		standardbids.WithDeliveredBidsSetter(comptrollerDB.(comptrollerdb.DeliveredBidsSetter)),
 		standardbids.WithReceivedBidsSetter(comptrollerDB.(comptrollerdb.ReceivedBidsSetter)),
+		standardbids.WithBidsReceivedHandlers([]bids.ReceivedHandler{blockPayments}),
 		standardbids.WithInterval(viper.GetDuration("bids.interval")),
 		standardbids.WithStartSlot(viper.GetInt64("bids.start-slot")),
-	)
-	if err != nil {
+	); err != nil {
 		return errors.Wrap(err, "failed to create bids service")
 	}
 

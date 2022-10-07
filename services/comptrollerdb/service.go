@@ -32,6 +32,20 @@ type Service interface {
 	Metadata(ctx context.Context, key string) ([]byte, error)
 }
 
+// AlternateBidsProvider defines functions to provide alternate bid information.
+type AlternateBidsProvider interface {
+	// AtlernateBids returns alternat bids matching the supplied filter.
+	AtlernateBids(ctx context.Context, filter *AlternateBidFilter) ([]*AlternateBid, error)
+}
+
+// AlternateBidsSetter defines functions to create and update alternate bids.
+type AlternateBidsSetter interface {
+	Service
+
+	// SetAlternateBid sets an alternate bid.
+	SetAlternateBid(ctx context.Context, alternateBid *AlternateBid) error
+}
+
 // BlockPaymentsProvider defines functions to provide block payment information.
 type BlockPaymentsProvider interface {
 	// BlockPayments returns block payments matching the supplied filter.

@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	zerologger "github.com/rs/zerolog/log"
+	"github.com/wealdtech/comptrollerd/services/bids"
 	"github.com/wealdtech/comptrollerd/services/chaintime"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
 	"github.com/wealdtech/comptrollerd/services/scheduler"
@@ -35,6 +36,7 @@ type Service struct {
 	receivedBidsSetter         comptrollerdb.ReceivedBidsSetter
 	deliveredBidTraceProviders []relayclient.DeliveredBidTraceProvider
 	deliveredBidsSetter        comptrollerdb.DeliveredBidsSetter
+	bidsReceivedHandlers       []bids.ReceivedHandler
 	interval                   time.Duration
 	activitySem                *semaphore.Weighted
 }
@@ -63,6 +65,7 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 		receivedBidsSetter:         parameters.receivedBidsSetter,
 		deliveredBidTraceProviders: parameters.deliveredBidTraceProviders,
 		deliveredBidsSetter:        parameters.deliveredBidsSetter,
+		bidsReceivedHandlers:       parameters.bidsReceivedHandlers,
 		interval:                   parameters.interval,
 		activitySem:                semaphore.NewWeighted(1),
 	}

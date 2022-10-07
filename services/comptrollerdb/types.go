@@ -31,12 +31,28 @@ type ValidatorRegistration struct {
 
 // BlockPayment holds information about the payments for a block.
 type BlockPayment struct {
-	Height              uint32
-	Hash                []byte
-	Slot                uint32
-	FeeRecipient        []byte
-	FeeRecipientRewards *big.Int
-	ProposerPayments    *big.Int
+	Height uint32
+	Hash   []byte
+	Slot   uint32
+	// ProposerFeeRecipient is the fee recipient address supplied by the proposer.
+	ProposerFeeRecipient []byte
+	// ProposerExpectedPayment is the payment expected by the proposer.
+	ProposerExpectedPayment *big.Int
+	// ProposerdPayment is the payment made to the proposer.
+	ProposerPayment *big.Int
+	// BuilderFeeRecipient is the fee recipient address supplied by the builder.
+	BuilderFeeRecipient []byte
+	// BuilderPayment is the payment made to the builder.
+	BuilderPayment *big.Int
+}
+
+// AlternateBid holds information on alternate bids that could have been better.
+type AlternateBid struct {
+	Slot          uint32
+	SelectedRelay string
+	SelectedValue *big.Int
+	BestRelay     string
+	BestValue     *big.Int
 }
 
 // ReceivedBid holds information on a bid received by a relay from a builder.

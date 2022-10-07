@@ -23,6 +23,37 @@ const (
 	OrderLatest
 )
 
+// AlternateBidFilter defines a filter for fetching alternate bids.
+// Filter elements are ANDed together.
+// Results are always returned in ascending slot order.
+type AlternateBidFilter struct {
+	// Limit is the maximum number of alternate bids to return.
+	// If 0 then there is no limit.
+	Limit uint32
+
+	// Order is either OrderEarliest, in which case the earliest results
+	// that match the filter are returned, or OrderLatest, in which case the
+	// latest results that match the filter are returned.
+	// The default is OrderEarliest.
+	Order Order
+
+	// FromSlot is the earliest slot from which to fetch results.
+	// If nil then there is no earliest slot.
+	FromSlot *uint32
+
+	// ToSlot is the latest slot to which to fetch results.
+	// If nil then there is no latest slot.
+	ToSlot *uint32
+
+	// SelectedRelays are the selected relays of the results.
+	// If nil then there is no selected relay filter.
+	SelectedRelays []string
+
+	// BestRelays are the best relays of the results.
+	// If nil then there is no best relay filter.
+	BestRelays []string
+}
+
 // BlockPaymentFilter defines a filter for fetching block rewards.
 // Filter elements are ANDed together.
 // Results are always returned in ascending block height order.
@@ -47,7 +78,7 @@ type BlockPaymentFilter struct {
 
 	// FeeRecipients are the fee recipients of the rewards.
 	// If nil then there is no fee recipient filter.
-	FeeRecipients [][]byte
+	// FeeRecipients [][]byte
 }
 
 // ValidatorRegistrationFilter defines a filter for fetching validator registrations.

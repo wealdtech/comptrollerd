@@ -22,38 +22,40 @@ import (
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
 )
 
-func (s *Service) catchup(ctx context.Context,
-	md *metadata) {
-
+func (s *Service) catchup(ctx context.Context, md *metadata) {
 	// We fetch up to, but not including, the current slot.
 	currentSlot := s.chainTime.CurrentSlot()
 	for slot := phase0.Slot(md.LatestSlot + 1); slot < currentSlot; slot++ {
 		log := log.With().Uint64("slot", uint64(slot)).Logger()
 		log.Trace().Msg("Handling slot")
 
-		ctx, cancel, err := s.receivedBidsSetter.BeginTx(ctx)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to begin transaction")
-			return
-		}
+		// We need to keep a version of the context unencumbered by a transaction for handlers,
+		// so scope the piece where the transaction lives.
+		{
+			ctx, cancel, err := s.receivedBidsSetter.BeginTx(ctx)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to begin transaction")
+				return
+			}
 
-		if err := s.handleSlot(ctx, slot); err != nil {
-			cancel()
-			log.Error().Err(err).Msg("Failed to handle slot")
-			return
-		}
+			if err := s.handleSlot(ctx, slot); err != nil {
+				cancel()
+				log.Error().Err(err).Msg("Failed to handle slot")
+				return
+			}
 
-		md.LatestSlot = int64(slot)
-		if err := s.setMetadata(ctx, md); err != nil {
-			cancel()
-			log.Error().Err(err).Msg("Failed to set metadata")
-			return
-		}
+			md.LatestSlot = int64(slot)
+			if err := s.setMetadata(ctx, md); err != nil {
+				cancel()
+				log.Error().Err(err).Msg("Failed to set metadata")
+				return
+			}
 
-		if err := s.receivedBidsSetter.CommitTx(ctx); err != nil {
-			cancel()
-			log.Error().Err(err).Msg("Failed to commit transaction")
-			return
+			if err := s.receivedBidsSetter.CommitTx(ctx); err != nil {
+				cancel()
+				log.Error().Err(err).Msg("Failed to commit transaction")
+				return
+			}
 		}
 
 		for _, relay := range s.receivedBidTracesProviders {
@@ -61,6 +63,11 @@ func (s *Service) catchup(ctx context.Context,
 		}
 		for _, relay := range s.deliveredBidTraceProviders {
 			monitorRelayUpdated(relay.Address())
+		}
+
+		for _, handler := range s.bidsReceivedHandlers {
+			log.Trace().Msg("Notifying handler")
+			go handler.BidsReceived(ctx, slot)
 		}
 
 		log.Trace().Msg("Handled slot")
@@ -138,34 +145,6 @@ func (s *Service) handleDeliveredBids(ctx context.Context, slot phase0.Slot) err
 			Value:                trace.Value,
 		}); err != nil {
 			return errors.Wrap(err, "failed to set delivered bid")
-		}
-
-		// For now just log these.
-		slot := uint32(trace.Slot)
-		bids, err := s.deliveredBidsSetter.(comptrollerdb.ReceivedBidsProvider).ReceivedBids(ctx, &comptrollerdb.ReceivedBidFilter{
-			FromSlot: &slot,
-			ToSlot:   &slot,
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to obtain received bids")
-		}
-		if len(bids) == 0 {
-			log.Info().Uint64("slot", uint64(slot)).Msg("No received bids!")
-		}
-		slotStart := s.chainTime.StartOfSlot(trace.Slot)
-		for _, bid := range bids {
-			if bid.Value.Cmp(trace.Value) > 0 {
-				slotStartDelta := bid.Timestamp.Unix() - slotStart.Unix()
-				// This is a higher bid.
-				log.Info().
-					Uint64("slot", uint64(slot)).
-					Stringer("value", trace.Value).
-					Str("relay", provider.Address()).
-					Int64("slot_start_delta", slotStartDelta).
-					Stringer("bid_value", bid.Value).
-					Str("bid_relay", bid.Relay).
-					Msg("Found a better bid")
-			}
 		}
 	}
 	return nil

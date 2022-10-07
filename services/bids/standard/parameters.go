@@ -19,6 +19,7 @@ import (
 
 	relayclient "github.com/attestantio/go-relay-client"
 	"github.com/rs/zerolog"
+	"github.com/wealdtech/comptrollerd/services/bids"
 	"github.com/wealdtech/comptrollerd/services/chaintime"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
 	"github.com/wealdtech/comptrollerd/services/metrics"
@@ -34,6 +35,7 @@ type parameters struct {
 	receivedBidsSetter         comptrollerdb.ReceivedBidsSetter
 	deliveredBidTraceProviders []relayclient.DeliveredBidTraceProvider
 	deliveredBidsSetter        comptrollerdb.DeliveredBidsSetter
+	bidsReceivedHandlers       []bids.ReceivedHandler
 	interval                   time.Duration
 	startSlot                  int64
 }
@@ -102,6 +104,13 @@ func WithDeliveredBidTraceProviders(providers []relayclient.DeliveredBidTracePro
 func WithDeliveredBidsSetter(setter comptrollerdb.DeliveredBidsSetter) Parameter {
 	return parameterFunc(func(p *parameters) {
 		p.deliveredBidsSetter = setter
+	})
+}
+
+// WithBidsReceivedHandlers sets the handlers for received bids.
+func WithBidsReceivedHandlers(handlers []bids.ReceivedHandler) Parameter {
+	return parameterFunc(func(p *parameters) {
+		p.bidsReceivedHandlers = handlers
 	})
 }
 

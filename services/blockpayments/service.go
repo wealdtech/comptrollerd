@@ -11,19 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bids
+package blockpayments
 
-import (
-	"context"
-
-	"github.com/attestantio/go-eth2-client/spec/phase0"
-)
-
-// Service defines a service that obtains bid information from relays.
+// Service defines a service that calculates block payment information from bids.
 type Service interface{}
-
-// ReceivedHandler defines the interface for handlers triggered by received bids.
-type ReceivedHandler interface {
-	// BidsReceived is called whenever the bids for a given slot have been obtained.
-	BidsReceived(ctx context.Context, slot phase0.Slot)
-}
