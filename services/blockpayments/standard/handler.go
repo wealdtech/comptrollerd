@@ -16,6 +16,7 @@ package standard
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -118,6 +119,12 @@ func (s *Service) checkInaccurateBid(ctx context.Context, slot phase0.Slot) erro
 		return nil
 	}
 	deliveredBid := deliveredBids[0]
+	if e := log.Trace(); e.Enabled() {
+		rawJSON, err := json.Marshal(deliveredBid)
+		if err == nil {
+			e.RawJSON("delivered_bid", rawJSON).Msg("Obtained delivered bid")
+		}
+	}
 
 	// Obtain the execution block.
 	slotStart := s.chainTime.StartOfSlot(slot)
@@ -135,6 +142,12 @@ func (s *Service) checkInaccurateBid(ctx context.Context, slot phase0.Slot) erro
 		return nil
 	}
 	block := blocks[0]
+	if e := log.Trace(); e.Enabled() {
+		rawJSON, err := json.Marshal(block)
+		if err == nil {
+			e.RawJSON("execution_block", rawJSON).Msg("Obtained execution block")
+		}
+	}
 
 	// Fetch the transactions for the block.
 	txs, err := s.transactionsProvider.Transactions(ctx, &execdb.TransactionFilter{
@@ -283,6 +296,11 @@ func (s *Service) calcProposerPayments(ctx context.Context, proposer []byte, blo
 			// Check the actual payment made and record it.
 			balanceChange, exists := balanceChanges[fmt.Sprintf("%x", tx.Hash)]
 			if exists {
+				change := new(big.Int).Sub(balanceChange.New, balanceChange.Old)
+				if change.Sign() == -1 {
+					log.Trace().Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("Negative tx payment to proposer; ignoring")
+					continue
+				}
 				log.Trace().Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("TX payment to proposer")
 				payments = payments.Add(payments, new(big.Int).Sub(balanceChange.New, balanceChange.Old))
 			}

@@ -51,7 +51,7 @@ import (
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.2.0"
+var ReleaseVersion = "0.2.1"
 
 func main() {
 	os.Exit(main2())
@@ -125,6 +125,7 @@ func fetchConfig() error {
 	pflag.Duration("relayclient.timeout", 60*time.Second, "Timeout for relay client requests")
 	pflag.Int64("bids.start-slot", -1, "First slot for which to obtain or re-obtain bids")
 	pflag.Int64("blockpayments.start-slot", -1, "First slot for which to calculate or re-calculate block payments")
+	pflag.Int64("blockpayments.replay-slot", -1, "Replay block payments for a single slot and then exit")
 	pflag.Parse()
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		return errors.Wrap(err, "failed to bind pflags to viper")
@@ -229,14 +230,14 @@ func startServices(ctx context.Context, monitor metrics.Service) error {
 		return errors.Wrap(err, "failed to start chain time service")
 	}
 
-	log.Trace().Msg("Starting relays service")
-	if err := startRelays(ctx, comptrollerDB, monitor, scheduler, chainTime); err != nil {
-		return errors.Wrap(err, "failed to start relays service")
-	}
-
 	log.Trace().Msg("Starting bids service")
 	if err := startBids(ctx, comptrollerDB, monitor, scheduler, chainTime, execDB); err != nil {
 		return errors.Wrap(err, "failed to start bids service")
+	}
+
+	log.Trace().Msg("Starting relays service")
+	if err := startRelays(ctx, comptrollerDB, monitor, scheduler, chainTime); err != nil {
+		return errors.Wrap(err, "failed to start relays service")
 	}
 
 	return nil
@@ -312,6 +313,7 @@ func startBids(
 		standardblockpayments.WithTransactionBalanceChangesProvider(execDB.(execdb.TransactionBalanceChangesProvider)),
 		standardblockpayments.WithTrackDistance(viper.GetUint32("blockpayments.track-distance")),
 		standardblockpayments.WithStartSlot(viper.GetInt64("blockpayments.start-slot")),
+		standardblockpayments.WithReplaySlot(viper.GetInt64("blockpayments.replay-slot")),
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create block payments service")

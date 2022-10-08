@@ -15,6 +15,7 @@ package standard
 
 import (
 	"context"
+	"os"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/pkg/errors"
@@ -72,11 +73,37 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 		activitySem:                       semaphore.NewWeighted(1),
 	}
 
+	if parameters.replaySlot >= 0 {
+		if err := s.onReplaySlot(ctx, phase0.Slot(parameters.replaySlot)); err != nil {
+			return nil, err
+		}
+		os.Exit(0)
+	}
+
 	if err := s.onStart(ctx, parameters.startSlot); err != nil {
 		return nil, err
 	}
 
 	return s, nil
+}
+
+func (s *Service) onReplaySlot(ctx context.Context, slot phase0.Slot) error {
+	ctx, cancel, err := s.blockPaymentsSetter.BeginTx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transaction")
+	}
+
+	if err := s.handleSlot(ctx, slot); err != nil {
+		cancel()
+		return errors.Wrap(err, "Failed to replay slot")
+	}
+
+	if err := s.blockPaymentsSetter.CommitTx(ctx); err != nil {
+		cancel()
+		return errors.Wrap(err, "failed to commit transaction")
+	}
+
+	return nil
 }
 
 func (s *Service) onStart(ctx context.Context,

@@ -37,6 +37,7 @@ type parameters struct {
 	alternateBidsSetter               comptrollerdb.AlternateBidsSetter
 	trackDistance                     uint32
 	startSlot                         int64
+	replaySlot                        int64
 }
 
 // Parameter is the interface for service parameters.
@@ -110,6 +111,13 @@ func WithTrackDistance(trackDistance uint32) Parameter {
 func WithStartSlot(slot int64) Parameter {
 	return parameterFunc(func(p *parameters) {
 		p.startSlot = slot
+	})
+}
+
+// WithReplaySlot sets a single slot to replay block payments.
+func WithReplaySlot(slot int64) Parameter {
+	return parameterFunc(func(p *parameters) {
+		p.replaySlot = slot
 	})
 }
 
