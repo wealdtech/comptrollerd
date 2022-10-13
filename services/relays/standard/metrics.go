@@ -24,6 +24,7 @@ import (
 var metricsNamespace = "comptrollerd"
 
 var latestTime *prometheus.GaugeVec
+var relayActive *prometheus.GaugeVec
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if latestTime != nil {
@@ -51,11 +52,31 @@ func registerPrometheusMetrics(ctx context.Context) error {
 		return errors.Wrap(err, "failed to register latest timestamp")
 	}
 
+	relayActive = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Subsystem: "relays",
+		Name:      "active",
+		Help:      "1 if active, 0 otherwise",
+	}, []string{"relay"})
+	if err := prometheus.Register(relayActive); err != nil {
+		return errors.Wrap(err, "failed to register relay active")
+	}
+
 	return nil
 }
 
 func monitorRegistrationsProcessed(relay string) {
 	if latestTime != nil {
 		latestTime.WithLabelValues(relay).SetToCurrentTime()
+	}
+}
+
+func monitorRelayActive(relay string, active bool) {
+	if relayActive != nil {
+		if active {
+			relayActive.WithLabelValues(relay).Set(1)
+		} else {
+			relayActive.WithLabelValues(relay).Set(0)
+		}
 	}
 }

@@ -99,8 +99,16 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 		proposers, err := provider.QueuedProposers(ctx)
 		if err != nil {
 			log.Warn().Err(err).Msg("Failed to obtain queued proposers for update")
+			monitorRelayActive(provider.Address(), false)
 			continue
 		}
+		if len(proposers) == 0 {
+			log.Trace().Msg("No proposers")
+			// We consider a provider with no proposers to be inactive.
+			monitorRelayActive(provider.Address(), false)
+			continue
+		}
+		monitorRelayActive(provider.Address(), true)
 
 		for _, proposer := range proposers {
 			slot := uint32(proposer.Slot)

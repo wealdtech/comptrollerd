@@ -201,12 +201,13 @@ func (s *Service) calcPayments(ctx context.Context,
 func (s *Service) checkInaccurateBid(ctx context.Context,
 	blockPayment *comptrollerdb.BlockPayment,
 ) error {
-	if blockPayment.ProposerPayment != blockPayment.ProposerExpectedPayment {
-		log.Warn().Uint32("block", blockPayment.Height).
+	if blockPayment.ProposerPayment.Cmp(blockPayment.ProposerExpectedPayment) != 0 {
+		log.Trace().Uint32("block", blockPayment.Height).
 			Uint32("slot", blockPayment.Slot).
 			Stringer("proposer_expected_payment", blockPayment.ProposerExpectedPayment).
 			Stringer("proposer_payment", blockPayment.ProposerPayment).
 			Msg("Inaccurate builder bid")
+		monitorInaccurateBid(phase0.Slot(blockPayment.Slot))
 	}
 
 	return nil
@@ -373,7 +374,9 @@ func (s *Service) checkPoorBidSelection(ctx context.Context, slot phase0.Slot) e
 		}); err != nil {
 			return errors.Wrap(err, "failed to set alternate bid")
 		}
+		monitorPoorBid(slot)
 	}
+
 	return nil
 }
 
