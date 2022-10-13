@@ -92,7 +92,17 @@ func (s *Service) catchup(ctx context.Context, md *metadata) {
 }
 
 func (s *Service) handleSlot(ctx context.Context, slot phase0.Slot) error {
-	if err := s.checkInaccurateBid(ctx, slot); err != nil {
+	blockPayment, err := s.calcPayments(ctx, slot)
+	if err != nil {
+		return err
+	}
+	if blockPayment == nil {
+		// No payment means we did not obtain the block; go no further.
+		return nil
+	}
+	log.Trace().Msg("Calculated payments")
+
+	if err := s.checkInaccurateBid(ctx, blockPayment); err != nil {
 		return err
 	}
 	log.Trace().Msg("Checked inaccurate bid")
@@ -105,48 +115,31 @@ func (s *Service) handleSlot(ctx context.Context, slot phase0.Slot) error {
 	return nil
 }
 
-func (s *Service) checkInaccurateBid(ctx context.Context, slot phase0.Slot) error {
-	dbSlot := uint32(slot)
-	deliveredBids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
-		FromSlot: &dbSlot,
-		ToSlot:   &dbSlot,
-	})
+func (s *Service) calcPayments(ctx context.Context,
+	slot phase0.Slot,
+) (
+	*comptrollerdb.BlockPayment,
+	error,
+) {
+	block, err := s.executionBlockOfSlot(ctx, slot)
 	if err != nil {
-		return errors.Wrap(err, "failed to obtain delivered bids")
+		return nil, err
 	}
-	if len(deliveredBids) == 0 {
-		// No delivered bids means this wasn't an MEV block (or one that we don't know about).
-		return nil
-	}
-	deliveredBid := deliveredBids[0]
-	if e := log.Trace(); e.Enabled() {
-		rawJSON, err := json.Marshal(deliveredBid)
-		if err == nil {
-			e.RawJSON("delivered_bid", rawJSON).Msg("Obtained delivered bid")
-		}
-	}
-
-	// Obtain the execution block.
-	slotStart := s.chainTime.StartOfSlot(slot)
-	blocks, err := s.blocksProvider.Blocks(ctx, &execdb.BlockFilter{
-		TimestampFrom: &slotStart,
-		TimestampTo:   &slotStart,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to obtain execution block")
-	}
-	if len(blocks) == 0 {
+	if block == nil {
 		// We do not know about this block.  It is possible that it was not incorporated in to the chain,
 		// or that there was a relay failure.  Either way, there isn't anything more we can do here.
 		log.Debug().Uint64("slot", uint64(slot)).Msg("No block obtained for slot")
-		return nil
+		return nil, nil
 	}
-	block := blocks[0]
-	if e := log.Trace(); e.Enabled() {
-		rawJSON, err := json.Marshal(block)
-		if err == nil {
-			e.RawJSON("execution_block", rawJSON).Msg("Obtained execution block")
-		}
+
+	deliveredBid, err := s.deliveredBidOfSlot(ctx, slot)
+	if err != nil {
+		return nil, err
+	}
+	if deliveredBid == nil {
+		// No delivered bids means this wasn't an externally built block (or one that we don't know about).
+		log.Trace().Uint64("slot", uint64(slot)).Msg("No delivered bid obtained for slot")
+		return nil, nil
 	}
 
 	// Fetch the transactions for the block.
@@ -155,15 +148,15 @@ func (s *Service) checkInaccurateBid(ctx context.Context, slot phase0.Slot) erro
 		To:   &block.Height,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to obtain execution block transactions")
+		return nil, errors.Wrap(err, "failed to obtain execution block transactions")
 	}
 
-	// We always calculate the fee recipient rewards.
-	costs, gasFees, feeRecipientPayments, err := s.calcFeeRecipientRewards(ctx, block, txs)
+	// Calculate builder rewards.
+	costs, tips, builderPayments, err := s.calcBuilderRewards(ctx, block, txs)
 	if err != nil {
-		return errors.Wrap(err, "failed to obtain calculate fee recipient rewards")
+		return nil, errors.Wrap(err, "failed to obtain calculate fee recipient rewards")
 	}
-	log.Trace().Uint32("block", block.Height).Str("fee_recipient", fmt.Sprintf("%#x", block.FeeRecipient)).Stringer("costs", costs).Stringer("gas_fees", gasFees).Stringer("payments", feeRecipientPayments).Msg("Calculated fee recipient rewards")
+	log.Trace().Uint32("block", block.Height).Str("fee_recipient", fmt.Sprintf("%#x", block.FeeRecipient)).Stringer("costs", costs).Stringer("tips", tips).Stringer("payments", builderPayments).Msg("Calculated builder rewards")
 
 	blockPayment := &comptrollerdb.BlockPayment{
 		Height:                  block.Height,
@@ -173,24 +166,22 @@ func (s *Service) checkInaccurateBid(ctx context.Context, slot phase0.Slot) erro
 	}
 
 	if bytes.Equal(block.FeeRecipient, deliveredBid.ProposerFeeRecipient) {
-		// The block fee recipient is that provided by the proposer.
+		// The builder is also the proposer.
 		blockPayment.ProposerFeeRecipient = block.FeeRecipient
-		blockPayment.ProposerExpectedPayment = deliveredBid.Value
-		blockPayment.ProposerPayment = new(big.Int).Add(gasFees, feeRecipientPayments)
+		blockPayment.ProposerPayment = new(big.Int).Add(tips, builderPayments)
 	} else {
-		// The block fee recipient is not that provided by the proposer.
+		// The builder is not the proposer.
 		blockPayment.ProposerFeeRecipient = deliveredBid.ProposerFeeRecipient
-		blockPayment.ProposerExpectedPayment = deliveredBid.Value
 		blockPayment.BuilderFeeRecipient = block.FeeRecipient
 
 		// We also want to calculate the payment to the proposer.
 		blockPayment.ProposerPayment, err = s.calcProposerPayments(ctx, deliveredBid.ProposerFeeRecipient, block, txs)
 		if err != nil {
-			return errors.Wrap(err, "failed to obtain calculate proposer payments")
+			return nil, errors.Wrap(err, "failed to obtain calculate proposer payments")
 		}
 
-		// The builder payment is net of the proposer payment.
-		blockPayment.BuilderPayment = new(big.Int).Sub(new(big.Int).Sub(new(big.Int).Add(gasFees, feeRecipientPayments), blockPayment.ProposerPayment), costs)
+		// The builder payment is net of the proposer payment and costs.
+		blockPayment.BuilderPayment = new(big.Int).Sub(new(big.Int).Sub(new(big.Int).Add(tips, builderPayments), blockPayment.ProposerPayment), costs)
 
 		log.Trace().Uint32("block", block.Height).
 			Str("proposer_fee_recipient", fmt.Sprintf("%#x", deliveredBid.ProposerFeeRecipient)).
@@ -201,19 +192,35 @@ func (s *Service) checkInaccurateBid(ctx context.Context, slot phase0.Slot) erro
 			Msg("End results")
 	}
 	if err := s.blockPaymentsSetter.SetBlockPayment(ctx, blockPayment); err != nil {
-		return errors.Wrap(err, "failed to set block payment")
+		return nil, errors.Wrap(err, "failed to set block payment")
+	}
+
+	return blockPayment, nil
+}
+
+func (s *Service) checkInaccurateBid(ctx context.Context,
+	blockPayment *comptrollerdb.BlockPayment,
+) error {
+	if blockPayment.ProposerPayment != blockPayment.ProposerExpectedPayment {
+		log.Warn().Uint32("block", blockPayment.Height).
+			Uint32("slot", blockPayment.Slot).
+			Stringer("proposer_expected_payment", blockPayment.ProposerExpectedPayment).
+			Stringer("proposer_payment", blockPayment.ProposerPayment).
+			Msg("Inaccurate builder bid")
 	}
 
 	return nil
 }
 
-func (s *Service) calcFeeRecipientRewards(ctx context.Context, block *execdb.Block, txs []*execdb.Transaction) (*big.Int, *big.Int, *big.Int, error) {
+func (s *Service) calcBuilderRewards(ctx context.Context, block *execdb.Block, txs []*execdb.Transaction) (*big.Int, *big.Int, *big.Int, error) {
+	log := log.With().Uint32("block", block.Height).Logger()
+
 	costs := big.NewInt(0)
 	tips := big.NewInt(0)
 	payments := big.NewInt(0)
 
-	// Fetch all balance changes to the proposer for the block.
-	feeRecipientBalanceChanges, err := s.transactionBalanceChangesProvider.TransactionBalanceChanges(ctx, &execdb.TransactionBalanceChangeFilter{
+	// Fetch all balance changes to the builder for the block.
+	builderBalanceChanges, err := s.transactionBalanceChangesProvider.TransactionBalanceChanges(ctx, &execdb.TransactionBalanceChangeFilter{
 		From:      &block.Height,
 		To:        &block.Height,
 		Addresses: [][]byte{block.FeeRecipient},
@@ -223,22 +230,25 @@ func (s *Service) calcFeeRecipientRewards(ctx context.Context, block *execdb.Blo
 	}
 	// Turn the balance changes in to a map for easy lookup.
 	balanceChanges := make(map[string]*execdb.TransactionBalanceChange)
-	for _, proposerBalanceChange := range feeRecipientBalanceChanges {
-		balanceChanges[fmt.Sprintf("%x", proposerBalanceChange.TransactionHash)] = proposerBalanceChange
+	for _, builderBalanceChange := range builderBalanceChanges {
+		balanceChanges[fmt.Sprintf("%x", builderBalanceChange.TransactionHash)] = builderBalanceChange
 	}
 
 	for _, tx := range txs {
+		log := log.With().Uint32("tx_index", tx.Index).Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Logger()
+
 		// Start off by calculating the gas fee.
 		gasFee := new(big.Int).Mul(big.NewInt(int64(tx.GasPrice)), big.NewInt(int64(tx.GasUsed)))
 		baseFee := new(big.Int).Mul(big.NewInt(int64(block.BaseFee)), big.NewInt(int64(tx.GasUsed)))
 		tip := new(big.Int).Sub(gasFee, baseFee)
 
 		if bytes.Equal(tx.From, block.FeeRecipient) {
-			// This transaction is from the fee recipient, its base fee is a cost.
+			// This transaction is from the builder, its base fee is a cost but the tip is a no-op.
+			log.Trace().Stringer("cost", baseFee).Msg("Found transaction from builder")
 			costs = costs.Add(costs, baseFee)
 			// Tips are net zero so ignore.
 		} else {
-			// This transaction is not from the fee recipient, the tip comes to us.
+			// This transaction is not from the builder, the tip goes to the builder.
 			tips = tips.Add(tips, tip)
 
 			balanceChange, exists := balanceChanges[fmt.Sprintf("%x", tx.Hash)]
@@ -246,26 +256,10 @@ func (s *Service) calcFeeRecipientRewards(ctx context.Context, block *execdb.Blo
 				transfer := new(big.Int).Sub(balanceChange.New, balanceChange.Old)
 				payment := new(big.Int).Sub(transfer, tip)
 				if payment.Cmp(big.NewInt(0)) > 0 {
-					log.Trace().Uint32("block", block.Height).Uint32("tx_index", tx.Index).Stringer("tip", tip).Stringer("transfer", transfer).Stringer("payment", payment).Msg("Found payment to fee recipient")
+					log.Trace().Stringer("old", balanceChange.Old).Stringer("new", balanceChange.New).Stringer("tip", tip).Stringer("transfer", transfer).Stringer("payment", payment).Msg("Found payment to builder")
 					payments = payments.Add(payments, payment)
 				}
 			}
-			//			// Check the actual payment made to see if it differs, and if so record it.
-			//			balanceChanges, err := s.transactionBalanceChangesProvider.TransactionBalanceChanges(ctx, &execdb.TransactionBalanceChangeFilter{
-			//				TxHashes:  [][]byte{tx.Hash},
-			//				Addresses: [][]byte{block.FeeRecipient},
-			//			})
-			//			if err != nil {
-			//				return nil, nil, nil, errors.Wrap(err, "failed to obtain transaction balance changes")
-			//			}
-			//			for _, balanceChange := range balanceChanges {
-			//				transfer := new(big.Int).Sub(balanceChange.New, balanceChange.Old)
-			//				payment := new(big.Int).Sub(transfer, tip)
-			//				if payment.Cmp(big.NewInt(0)) > 0 {
-			//					log.Trace().Uint32("block", block.Height).Uint32("tx_index", tx.Index).Stringer("tip", tip).Stringer("transfer", transfer).Stringer("payment", payment).Msg("Found payment to fee recipient")
-			//					payments = payments.Add(payments, payment)
-			//				}
-			//			}
 		}
 	}
 
@@ -273,6 +267,8 @@ func (s *Service) calcFeeRecipientRewards(ctx context.Context, block *execdb.Blo
 }
 
 func (s *Service) calcProposerPayments(ctx context.Context, proposer []byte, block *execdb.Block, txs []*execdb.Transaction) (*big.Int, error) {
+	log := log.With().Uint32("block", block.Height).Logger()
+
 	payments := big.NewInt(0)
 
 	// Fetch all balance changes to the proposer for the block.
@@ -291,31 +287,32 @@ func (s *Service) calcProposerPayments(ctx context.Context, proposer []byte, blo
 	}
 
 	for _, tx := range txs {
-		// If this transaction is not from the proposer we have to look for value transfers within it.
-		if !bytes.Equal(tx.From, proposer) {
-			// Check the actual payment made and record it.
+		log := log.With().Uint32("tx_index", tx.Index).Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Logger()
+
+		if tx.Status == 0 {
+			log.Trace().Msg("Transaction failed; ignoring payments within it")
+			continue
+		}
+
+		switch {
+		case tx.To != nil && !bytes.Equal(tx.From, proposer) && bytes.Equal(*tx.To, proposer):
+			log.Trace().Stringer("value", tx.Value).Msg("TX with proposer as recipient")
+			payments = payments.Add(payments, tx.Value)
+		case tx.To != nil && bytes.Equal(tx.From, proposer) && bytes.Equal(*tx.To, proposer):
+			// This is a self-sent payment, ignore.
+		case !bytes.Equal(tx.From, proposer):
+			// This is a payment to someone other than the proposer, check for value transfers to the proposer
+			// within it to catch smart contract transfers.
 			balanceChange, exists := balanceChanges[fmt.Sprintf("%x", tx.Hash)]
 			if exists {
 				change := new(big.Int).Sub(balanceChange.New, balanceChange.Old)
 				if change.Sign() == -1 {
-					log.Trace().Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("Negative tx payment to proposer; ignoring")
-					continue
+					log.Trace().Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("Negative tx payment to proposer; ignoring")
+				} else {
+					log.Trace().Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("TX payment to proposer")
+					payments = payments.Add(payments, new(big.Int).Sub(balanceChange.New, balanceChange.Old))
 				}
-				log.Trace().Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("TX payment to proposer")
-				payments = payments.Add(payments, new(big.Int).Sub(balanceChange.New, balanceChange.Old))
 			}
-			//			// Check the actual payment made and record it.
-			//			balanceChanges, err := s.transactionBalanceChangesProvider.TransactionBalanceChanges(ctx, &execdb.TransactionBalanceChangeFilter{
-			//				TxHashes:  [][]byte{tx.Hash},
-			//				Addresses: [][]byte{proposer},
-			//			})
-			//			if err != nil {
-			//				return nil, errors.Wrap(err, "failed to obtain transaction balance changes")
-			//			}
-			//			for _, balanceChange := range balanceChanges {
-			//				log.Trace().Str("tx_hash", fmt.Sprintf("%#x", tx.Hash)).Stringer("payment", new(big.Int).Sub(balanceChange.New, balanceChange.Old)).Msg("TX payment to proposer")
-			//				payments = payments.Add(payments, new(big.Int).Sub(balanceChange.New, balanceChange.Old))
-			//			}
 		}
 	}
 
@@ -378,4 +375,66 @@ func (s *Service) checkPoorBidSelection(ctx context.Context, slot phase0.Slot) e
 		}
 	}
 	return nil
+}
+
+// executionBlockOfSlot returns the execution block given a consensus slot.
+func (s *Service) executionBlockOfSlot(ctx context.Context,
+	slot phase0.Slot,
+) (
+	*execdb.Block,
+	error,
+) {
+	slotStart := s.chainTime.StartOfSlot(slot)
+	blocks, err := s.blocksProvider.Blocks(ctx, &execdb.BlockFilter{
+		TimestampFrom: &slotStart,
+		TimestampTo:   &slotStart,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to obtain execution block")
+	}
+	if len(blocks) == 0 {
+		// No block but no error.
+		return nil, nil
+	}
+	block := blocks[0]
+
+	if e := log.Trace(); e.Enabled() {
+		rawJSON, err := json.Marshal(block)
+		if err == nil {
+			e.RawJSON("execution_block", rawJSON).Msg("Obtained execution block")
+		}
+	}
+
+	return block, nil
+}
+
+// deliveredBidOfSlot returns the delivered bid given a consensus slot.
+func (s *Service) deliveredBidOfSlot(ctx context.Context,
+	slot phase0.Slot,
+) (
+	*comptrollerdb.DeliveredBid,
+	error,
+) {
+	dbSlot := uint32(slot)
+	deliveredBids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
+		FromSlot: &dbSlot,
+		ToSlot:   &dbSlot,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to obtain delivered bids")
+	}
+	if len(deliveredBids) == 0 {
+		// No delivered bids but no error.
+		return nil, nil
+	}
+	deliveredBid := deliveredBids[0]
+
+	if e := log.Trace(); e.Enabled() {
+		rawJSON, err := json.Marshal(deliveredBid)
+		if err == nil {
+			e.RawJSON("delivered_bid", rawJSON).Msg("Obtained delivered bid")
+		}
+	}
+
+	return deliveredBid, nil
 }
