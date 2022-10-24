@@ -25,8 +25,8 @@ import (
 var metricsNamespace = "comptrollerd"
 
 var latestTime prometheus.Gauge
-var poorBids prometheus.Gauge
-var inaccurateBids prometheus.Gauge
+var betterBids *prometheus.GaugeVec
+var inaccurateBids *prometheus.GaugeVec
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if latestTime != nil {
@@ -53,21 +53,21 @@ func registerPrometheusMetrics(ctx context.Context) error {
 	if err := prometheus.Register(latestTime); err != nil {
 		return errors.Wrap(err, "failed to register latest timestamp")
 	}
-	poorBids = prometheus.NewGauge(prometheus.GaugeOpts{
+	betterBids = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "blockpayments",
-		Name:      "poor_bids_total",
-		Help:      "Number of poor bids seen",
-	})
-	if err := prometheus.Register(poorBids); err != nil {
-		return errors.Wrap(err, "failed to register poor bids")
+		Name:      "better_bids_total",
+		Help:      "Number of better bids seen",
+	}, []string{"relay"})
+	if err := prometheus.Register(betterBids); err != nil {
+		return errors.Wrap(err, "failed to register better bids")
 	}
-	inaccurateBids = prometheus.NewGauge(prometheus.GaugeOpts{
+	inaccurateBids = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "blockpayments",
 		Name:      "inaccurate_bids_total",
 		Help:      "Number of inaccurate bids seen",
-	})
+	}, []string{"relay"})
 	if err := prometheus.Register(inaccurateBids); err != nil {
 		return errors.Wrap(err, "failed to register inaccurate bids")
 	}
@@ -81,14 +81,14 @@ func monitorPaymentsUpdated(_ phase0.Slot) {
 	}
 }
 
-func monitorPoorBid(_ phase0.Slot) {
-	if poorBids != nil {
-		poorBids.Inc()
+func monitorBetterBid(relay string, _ phase0.Slot) {
+	if betterBids != nil {
+		betterBids.WithLabelValues(relay).Inc()
 	}
 }
 
-func monitorInaccurateBid(_ phase0.Slot) {
+func monitorInaccurateBid(relay string, _ phase0.Slot) {
 	if inaccurateBids != nil {
-		inaccurateBids.Inc()
+		inaccurateBids.WithLabelValues(relay).Inc()
 	}
 }

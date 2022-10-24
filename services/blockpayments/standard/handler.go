@@ -92,6 +92,8 @@ func (s *Service) catchup(ctx context.Context, md *metadata) {
 }
 
 func (s *Service) handleSlot(ctx context.Context, slot phase0.Slot) error {
+	log := log.With().Uint64("slot", uint64(slot)).Logger()
+
 	blockPayment, err := s.calcPayments(ctx, slot)
 	if err != nil {
 		return err
@@ -121,6 +123,8 @@ func (s *Service) calcPayments(ctx context.Context,
 	*comptrollerdb.BlockPayment,
 	error,
 ) {
+	log := log.With().Uint64("slot", uint64(slot)).Logger()
+
 	block, err := s.executionBlockOfSlot(ctx, slot)
 	if err != nil {
 		return nil, err
@@ -128,7 +132,7 @@ func (s *Service) calcPayments(ctx context.Context,
 	if block == nil {
 		// We do not know about this block.  It is possible that it was not incorporated in to the chain,
 		// or that there was a relay failure.  Either way, there isn't anything more we can do here.
-		log.Debug().Uint64("slot", uint64(slot)).Msg("No block obtained for slot")
+		log.Debug().Msg("No block obtained for slot")
 		return nil, nil
 	}
 
@@ -138,7 +142,7 @@ func (s *Service) calcPayments(ctx context.Context,
 	}
 	if deliveredBid == nil {
 		// No delivered bids means this wasn't an externally built block (or one that we don't know about).
-		log.Trace().Uint64("slot", uint64(slot)).Msg("No delivered bid obtained for slot")
+		log.Trace().Msg("No delivered bid obtained for slot")
 		return nil, nil
 	}
 
@@ -166,11 +170,11 @@ func (s *Service) calcPayments(ctx context.Context,
 	}
 
 	if bytes.Equal(block.FeeRecipient, deliveredBid.ProposerFeeRecipient) {
-		// The builder is also the proposer.
+		log.Trace().Str("fee_recipient", fmt.Sprintf("%#x", block.FeeRecipient)).Str("proposer_fee_recipient", fmt.Sprintf("%#x", deliveredBid.ProposerFeeRecipient)).Msg("Builder is proposer; no further calculations")
 		blockPayment.ProposerFeeRecipient = block.FeeRecipient
 		blockPayment.ProposerPayment = new(big.Int).Add(tips, builderPayments)
 	} else {
-		// The builder is not the proposer.
+		log.Trace().Msg("Builder and proposer are separate; obtaining proposer payment")
 		blockPayment.ProposerFeeRecipient = deliveredBid.ProposerFeeRecipient
 		blockPayment.BuilderFeeRecipient = block.FeeRecipient
 
@@ -182,15 +186,16 @@ func (s *Service) calcPayments(ctx context.Context,
 
 		// The builder payment is net of the proposer payment and costs.
 		blockPayment.BuilderPayment = new(big.Int).Sub(new(big.Int).Sub(new(big.Int).Add(tips, builderPayments), blockPayment.ProposerPayment), costs)
-
-		log.Trace().Uint32("block", block.Height).
-			Str("proposer_fee_recipient", fmt.Sprintf("%#x", deliveredBid.ProposerFeeRecipient)).
-			Stringer("proposer_expected_payment", blockPayment.ProposerExpectedPayment).
-			Stringer("proposer_payment", blockPayment.ProposerPayment).
-			Str("builder_fee_recipient", fmt.Sprintf("%#x", block.FeeRecipient)).
-			Stringer("builder_payment", blockPayment.BuilderPayment).
-			Msg("End results")
 	}
+	log.Trace().Uint32("block", block.Height).
+		Str("proposer_fee_recipient", fmt.Sprintf("%#x", deliveredBid.ProposerFeeRecipient)).
+		Stringer("proposer_expected_payment", blockPayment.ProposerExpectedPayment).
+		Stringer("proposer_payment", blockPayment.ProposerPayment).
+		Str("builder_fee_recipient", fmt.Sprintf("%#x", block.FeeRecipient)).
+		Stringer("builder_payment", blockPayment.BuilderPayment).
+		Stringer("builder_costs", costs).
+		Msg("End results")
+
 	if err := s.blockPaymentsSetter.SetBlockPayment(ctx, blockPayment); err != nil {
 		return nil, errors.Wrap(err, "failed to set block payment")
 	}
@@ -202,12 +207,26 @@ func (s *Service) checkInaccurateBid(ctx context.Context,
 	blockPayment *comptrollerdb.BlockPayment,
 ) error {
 	if blockPayment.ProposerPayment.Cmp(blockPayment.ProposerExpectedPayment) != 0 {
+		// Obtain the delivered bid so we know which relay it was.
+		deliveredBids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
+			FromSlot: &blockPayment.Slot,
+			ToSlot:   &blockPayment.Slot,
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to obtain delivered bids")
+		}
+		if len(deliveredBids) == 0 {
+			return nil
+		}
+		deliveredBid := deliveredBids[0]
+
 		log.Trace().Uint32("block", blockPayment.Height).
 			Uint32("slot", blockPayment.Slot).
+			Str("relay", deliveredBid.Relay).
 			Stringer("proposer_expected_payment", blockPayment.ProposerExpectedPayment).
 			Stringer("proposer_payment", blockPayment.ProposerPayment).
 			Msg("Inaccurate builder bid")
-		monitorInaccurateBid(phase0.Slot(blockPayment.Slot))
+		monitorInaccurateBid(deliveredBid.Relay, phase0.Slot(blockPayment.Slot))
 	}
 
 	return nil
@@ -321,6 +340,8 @@ func (s *Service) calcProposerPayments(ctx context.Context, proposer []byte, blo
 }
 
 func (s *Service) checkPoorBidSelection(ctx context.Context, slot phase0.Slot) error {
+	slotStart := s.chainTime.StartOfSlot(slot)
+
 	dbSlot := uint32(slot)
 	deliveredBids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
 		FromSlot: &dbSlot,
@@ -345,6 +366,10 @@ func (s *Service) checkPoorBidSelection(ctx context.Context, slot phase0.Slot) e
 
 	var bestBid *comptrollerdb.ReceivedBid
 	for _, bid := range receivedBids {
+		if bid.Timestamp.After(slotStart) {
+			// This bid arrived after the slot start; ignore.
+			continue
+		}
 		if bid.Value.Cmp(deliveredBid.Value) > 0 {
 			// This is higher value than the delivered bid.
 			if bestBid == nil || bid.Value.Cmp(bestBid.Value) > 0 {
@@ -374,7 +399,7 @@ func (s *Service) checkPoorBidSelection(ctx context.Context, slot phase0.Slot) e
 		}); err != nil {
 			return errors.Wrap(err, "failed to set alternate bid")
 		}
-		monitorPoorBid(slot)
+		monitorBetterBid(bestBid.Relay, slot)
 	}
 
 	return nil
