@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/attestantio/go-eth2-client v0.13.6
 	github.com/attestantio/go-execution-client v0.7.5
-	github.com/attestantio/go-relay-client v0.2.1
+	github.com/attestantio/go-relay-client v0.2.2
 	github.com/aws/aws-sdk-go v1.44.81
 	github.com/jackc/pgtype v1.12.0
 	github.com/jackc/pgx/v4 v4.17.2

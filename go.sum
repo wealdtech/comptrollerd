@@ -81,8 +81,8 @@ github.com/attestantio/go-eth2-client v0.13.6 h1:KivmTvEdW5Ah3wSsfb8u/8cZZh/BtaR
 github.com/attestantio/go-eth2-client v0.13.6/go.mod h1:bcg5gfjVcm+MtcaZfzv/uSWNHU4i8hGamVG+9JCZnC0=
 github.com/attestantio/go-execution-client v0.7.5 h1:F0Fo8SkbNpF0Qb1sNeHj2kkslkCe/Ai9NOAlARw/SpQ=
 github.com/attestantio/go-execution-client v0.7.5/go.mod h1:00fGxH6GTcvFkI2cZwNq6MBAQqunsNOQHqyLlxZkFRI=
-github.com/attestantio/go-relay-client v0.2.1 h1:D6xHaStxKOU7Ckx2AE6jbcuPh8jC53KDaSkiOYNZzRo=
-github.com/attestantio/go-relay-client v0.2.1/go.mod h1:W6ZvpZCpSsmEwFCvf5RrJ7oyZq8fNeUARjfxd7xKzkk=
+github.com/attestantio/go-relay-client v0.2.2 h1:kTf0pKpZbJ2+ij5G20ebeqnNAxWPPjbtXnq+5uAkoIY=
+github.com/attestantio/go-relay-client v0.2.2/go.mod h1:W6ZvpZCpSsmEwFCvf5RrJ7oyZq8fNeUARjfxd7xKzkk=
 github.com/aws/aws-sdk-go v1.44.81 h1:C8oBZ+a+ka0qk3Q24MohQIFq0tkbO8IAu5tfpAMKVWE=
 github.com/aws/aws-sdk-go v1.44.81/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
