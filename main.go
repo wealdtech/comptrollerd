@@ -31,7 +31,6 @@ import (
 	relayclient "github.com/attestantio/go-relay-client"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	zerologger "github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wealdtech/comptrollerd/services/bids"
@@ -48,10 +47,11 @@ import (
 	standardscheduler "github.com/wealdtech/comptrollerd/services/scheduler/standard"
 	"github.com/wealdtech/comptrollerd/util"
 	"github.com/wealdtech/execd/services/execdb"
+	majordomo "github.com/wealdtech/go-majordomo"
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.2.2"
+var ReleaseVersion = "0.2.3-dev"
 
 func main() {
 	os.Exit(main2())
@@ -62,12 +62,18 @@ func main2() int {
 	defer cancel()
 
 	if err := fetchConfig(); err != nil {
-		zerologger.Error().Err(err).Msg("Failed to fetch configuration")
+		fmt.Fprintf(os.Stderr, "failed to fetch configuration: %v\n", err)
+		return 1
+	}
+
+	majordomo, err := util.InitMajordomo(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialise majordomo: %v\n", err)
 		return 1
 	}
 
 	if err := initLogging(); err != nil {
-		log.Error().Err(err).Msg("Failed to initialise logging")
+		fmt.Fprintf(os.Stderr, "failed to initialise logging: %v\n", err)
 		return 1
 	}
 
@@ -76,6 +82,11 @@ func main2() int {
 
 	logModules()
 	log.Info().Str("version", ReleaseVersion).Msg("Starting comptrollerd")
+
+	if err := initTracing(ctx, majordomo); err != nil {
+		log.Error().Err(err).Msg("Failed to initialise tracing")
+		return 1
+	}
 
 	runtime.GOMAXPROCS(runtime.NumCPU() * 8)
 
@@ -92,7 +103,7 @@ func main2() int {
 	setRelease(ctx, ReleaseVersion)
 	setReady(ctx, false)
 
-	if err := startServices(ctx, monitor); err != nil {
+	if err := startServices(ctx, monitor, majordomo); err != nil {
 		log.Error().Err(err).Msg("Failed to initialise services")
 		return 1
 	}
@@ -185,13 +196,7 @@ func startMonitor(ctx context.Context) (metrics.Service, error) {
 	return monitor, nil
 }
 
-func startServices(ctx context.Context, monitor metrics.Service) error {
-	log.Trace().Msg("Starting majordomo")
-	majordomo, err := util.InitMajordomo(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to start majordomo")
-	}
-
+func startServices(ctx context.Context, monitor metrics.Service, majordomo majordomo.Service) error {
 	log.Trace().Msg("Starting execution database")
 	execDB, err := util.InitExecDB(ctx, majordomo)
 	if err != nil {

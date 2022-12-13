@@ -104,10 +104,10 @@ func (s *Service) handleSlot(ctx context.Context, slot phase0.Slot) error {
 	}
 	log.Trace().Msg("Calculated payments")
 
-	if err := s.checkInaccurateBid(ctx, blockPayment); err != nil {
+	if err := s.checkUnderpaidBid(ctx, blockPayment); err != nil {
 		return err
 	}
-	log.Trace().Msg("Checked inaccurate bid")
+	log.Trace().Msg("Checked underpaid bid")
 
 	if err := s.checkPoorBidSelection(ctx, slot); err != nil {
 		return err
@@ -203,10 +203,10 @@ func (s *Service) calcPayments(ctx context.Context,
 	return blockPayment, nil
 }
 
-func (s *Service) checkInaccurateBid(ctx context.Context,
+func (s *Service) checkUnderpaidBid(ctx context.Context,
 	blockPayment *comptrollerdb.BlockPayment,
 ) error {
-	if blockPayment.ProposerPayment.Cmp(blockPayment.ProposerExpectedPayment) != 0 {
+	if blockPayment.ProposerPayment.Cmp(blockPayment.ProposerExpectedPayment) < 0 {
 		// Obtain the delivered bid so we know which relay it was.
 		deliveredBids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
 			FromSlot: &blockPayment.Slot,
@@ -225,8 +225,8 @@ func (s *Service) checkInaccurateBid(ctx context.Context,
 			Str("relay", deliveredBid.Relay).
 			Stringer("proposer_expected_payment", blockPayment.ProposerExpectedPayment).
 			Stringer("proposer_payment", blockPayment.ProposerPayment).
-			Msg("Inaccurate builder bid")
-		monitorInaccurateBid(deliveredBid.Relay, phase0.Slot(blockPayment.Slot))
+			Msg("Underpaid builder bid")
+		monitorUnderpaidBid(deliveredBid.Relay, phase0.Slot(blockPayment.Slot))
 	}
 
 	return nil

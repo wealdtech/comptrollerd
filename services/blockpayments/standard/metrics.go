@@ -26,7 +26,7 @@ var metricsNamespace = "comptrollerd"
 
 var latestTime prometheus.Gauge
 var betterBids *prometheus.GaugeVec
-var inaccurateBids *prometheus.GaugeVec
+var underpaidBids *prometheus.GaugeVec
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if latestTime != nil {
@@ -62,14 +62,14 @@ func registerPrometheusMetrics(ctx context.Context) error {
 	if err := prometheus.Register(betterBids); err != nil {
 		return errors.Wrap(err, "failed to register better bids")
 	}
-	inaccurateBids = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	underpaidBids = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "blockpayments",
-		Name:      "inaccurate_bids_total",
-		Help:      "Number of inaccurate bids seen",
+		Name:      "underpaid_bids_total",
+		Help:      "Number of underpaid bids seen",
 	}, []string{"relay"})
-	if err := prometheus.Register(inaccurateBids); err != nil {
-		return errors.Wrap(err, "failed to register inaccurate bids")
+	if err := prometheus.Register(underpaidBids); err != nil {
+		return errors.Wrap(err, "failed to register underpaid bids")
 	}
 
 	return nil
@@ -87,8 +87,8 @@ func monitorBetterBid(relay string, _ phase0.Slot) {
 	}
 }
 
-func monitorInaccurateBid(relay string, _ phase0.Slot) {
-	if inaccurateBids != nil {
-		inaccurateBids.WithLabelValues(relay).Inc()
+func monitorUnderpaidBid(relay string, _ phase0.Slot) {
+	if underpaidBids != nil {
+		underpaidBids.WithLabelValues(relay).Inc()
 	}
 }
