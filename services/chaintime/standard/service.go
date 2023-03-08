@@ -14,11 +14,9 @@
 package standard
 
 import (
-	"bytes"
 	"context"
 	"time"
 
-	eth2client "github.com/attestantio/go-eth2-client"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -27,11 +25,9 @@ import (
 
 // Service provides chain time services.
 type Service struct {
-	genesisTime        time.Time
-	slotDuration       time.Duration
-	slotsPerEpoch      uint64
-	altairForkEpoch    phase0.Epoch
-	bellatrixForkEpoch phase0.Epoch
+	genesisTime   time.Time
+	slotDuration  time.Duration
+	slotsPerEpoch uint64
 }
 
 // module-wide log.
@@ -76,25 +72,10 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 		return nil, errors.New("SLOTS_PER_EPOCH of unexpected type")
 	}
 
-	altairForkEpoch, err := fetchAltairForkEpoch(ctx, parameters.forkScheduleProvider)
-	if err != nil {
-		// Set to far future epoch.
-		altairForkEpoch = 0xffffffffffffffff
-	}
-	log.Trace().Uint64("epoch", uint64(altairForkEpoch)).Msg("Obtained Altair fork epoch")
-	bellatrixForkEpoch, err := fetchBellatrixForkEpoch(ctx, parameters.forkScheduleProvider)
-	if err != nil {
-		// Set to far future epoch.
-		bellatrixForkEpoch = 0xffffffffffffffff
-	}
-	log.Trace().Uint64("epoch", uint64(bellatrixForkEpoch)).Msg("Obtained Bellatrix fork epoch")
-
 	s := &Service{
-		genesisTime:        genesisTime,
-		slotDuration:       slotDuration,
-		slotsPerEpoch:      slotsPerEpoch,
-		altairForkEpoch:    altairForkEpoch,
-		bellatrixForkEpoch: bellatrixForkEpoch,
+		genesisTime:   genesisTime,
+		slotDuration:  slotDuration,
+		slotsPerEpoch: slotsPerEpoch,
 	}
 
 	return s, nil
@@ -154,52 +135,4 @@ func (s *Service) EpochOfTimestamp(timestamp time.Time) phase0.Epoch {
 	}
 	secondsSinceGenesis := uint64(timestamp.Sub(s.genesisTime).Seconds())
 	return phase0.Epoch(secondsSinceGenesis / uint64(s.slotDuration.Seconds()) / s.slotsPerEpoch)
-}
-
-// AltairInitialEpoch provides the epoch at which the Altair hard fork takes place.
-func (s *Service) AltairInitialEpoch() phase0.Epoch {
-	return s.altairForkEpoch
-}
-
-// BellatrixInitialEpoch provides the epoch at which the Bellatrix hard fork takes place.
-func (s *Service) BellatrixInitialEpoch() phase0.Epoch {
-	return s.bellatrixForkEpoch
-}
-
-func fetchAltairForkEpoch(ctx context.Context, provider eth2client.ForkScheduleProvider) (phase0.Epoch, error) {
-	forkSchedule, err := provider.ForkSchedule(ctx)
-	if err != nil {
-		return 0, err
-	}
-	forkVersion := 0
-	for i := range forkSchedule {
-		if bytes.Equal(forkSchedule[i].CurrentVersion[:], forkSchedule[i].PreviousVersion[:]) {
-			// This is the genesis fork; ignore it.
-			continue
-		}
-		forkVersion++
-		if forkVersion == 1 {
-			return forkSchedule[i].Epoch, nil
-		}
-	}
-	return 0, errors.New("no altair fork obtained")
-}
-
-func fetchBellatrixForkEpoch(ctx context.Context, provider eth2client.ForkScheduleProvider) (phase0.Epoch, error) {
-	forkSchedule, err := provider.ForkSchedule(ctx)
-	if err != nil {
-		return 0, err
-	}
-	forkVersion := 0
-	for i := range forkSchedule {
-		if bytes.Equal(forkSchedule[i].CurrentVersion[:], forkSchedule[i].PreviousVersion[:]) {
-			// This is the genesis fork; ignore it.
-			continue
-		}
-		forkVersion++
-		if forkVersion == 2 {
-			return forkSchedule[i].Epoch, nil
-		}
-	}
-	return 0, errors.New("no bellatrix fork obtained")
 }

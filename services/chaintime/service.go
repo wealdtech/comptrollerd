@@ -47,10 +47,4 @@ type Service interface {
 
 	// EpochOfTimestamp provides the epoch of the given timestamp.
 	EpochOfTimestamp(timestamp time.Time) phase0.Epoch
-
-	// AltairInitialEpoch provides the epoch at which the Altair hard fork takes place.
-	AltairInitialEpoch() phase0.Epoch
-
-	// BellatrixInitialEpoch provides the epoch at which the Bellatrix hard fork takes place.
-	BellatrixInitialEpoch() phase0.Epoch
 }
