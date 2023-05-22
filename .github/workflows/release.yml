@@ -55,7 +55,9 @@ jobs:
         run: git checkout ${{ github.ref_name }}
 
       - name: Fetch repository dependencies
-        run: go get -v -t ./...
+        run: go get -x -v -t ./...
+        env:
+          GIT_TRACE: true
 
       - name: Compile
         run: |
