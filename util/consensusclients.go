@@ -22,8 +22,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var consensusClients map[string]consensusclient.Service
-var consensusClientsMu sync.Mutex
+var (
+	consensusClients   map[string]consensusclient.Service
+	consensusClientsMu sync.Mutex
+)
 
 // FetchConsensusClient fetches a consensus client, instantiating it if required.
 func FetchConsensusClient(ctx context.Context, address string) (consensusclient.Service, error) {

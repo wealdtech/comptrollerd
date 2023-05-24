@@ -63,9 +63,8 @@ WHERE f_key = $1`,
 		key).Scan(
 		res,
 	)
-
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, errors.Wrap(err, "failed to obtain metadata")

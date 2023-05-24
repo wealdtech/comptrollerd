@@ -101,6 +101,7 @@ func (s *Service) CurrentSlot() phase0.Slot {
 	if s.genesisTime.After(time.Now()) {
 		return 0
 	}
+
 	return phase0.Slot(uint64(time.Since(s.genesisTime).Seconds()) / uint64(s.slotDuration.Seconds()))
 }
 
@@ -124,6 +125,7 @@ func (s *Service) SlotOfTimestamp(timestamp time.Time) phase0.Slot {
 	if timestamp.Before(s.genesisTime) {
 		return 0
 	}
+
 	secondsSinceGenesis := uint64(timestamp.Sub(s.genesisTime).Seconds())
 	return phase0.Slot(secondsSinceGenesis / uint64(s.slotDuration.Seconds()))
 }
@@ -133,6 +135,7 @@ func (s *Service) EpochOfTimestamp(timestamp time.Time) phase0.Epoch {
 	if timestamp.Before(s.genesisTime) {
 		return 0
 	}
+
 	secondsSinceGenesis := uint64(timestamp.Sub(s.genesisTime).Seconds())
 	return phase0.Epoch(secondsSinceGenesis / uint64(s.slotDuration.Seconds()) / s.slotsPerEpoch)
 }

@@ -88,7 +88,7 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	config.AfterConnect = registerCustomTypes
 	config.ConnConfig.TLSConfig = tlsConfig
 
-	pool, err = pgxpool.ConnectConfig(context.Background(), config)
+	pool, err = pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to database")
 	}
@@ -106,7 +106,7 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	return s, nil
 }
 
-func registerCustomTypes(ctx context.Context, conn *pgx.Conn) error {
+func registerCustomTypes(_ context.Context, conn *pgx.Conn) error {
 	conn.ConnInfo().RegisterDataType(pgtype.DataType{
 		Value: &shopspring.Numeric{},
 		Name:  "numeric",

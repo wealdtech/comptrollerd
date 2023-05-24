@@ -169,8 +169,20 @@ func fetchConfig() error {
 	viper.SetDefault("blockpayments.track-distance", 96)
 
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return errors.Wrap(err, "failed to read configuration file")
+		switch {
+		case errors.As(err, &viper.ConfigFileNotFoundError{}):
+			// It is allowable for comptrollerd to not have a configuration file, but only if
+			// we have the information from elsewhere (e.g. environment variables).  Check
+			// to see if we have a comptroller server configured, as if not we aren't going to
+			// get very far anyway.
+			if viper.GetString("comptrollerdb.server") == "" {
+				// Assume the underlying issue is that the configuration file is missing.
+				return errors.Wrap(err, "could not find the configuration file")
+			}
+		case errors.As(err, &viper.ConfigParseError{}):
+			return errors.Wrap(err, "could not parse the configuration file")
+		default:
+			return errors.Wrap(err, "failed to obtain configuration")
 		}
 	}
 
@@ -241,7 +253,7 @@ func startServices(ctx context.Context, monitor metrics.Service, majordomo major
 	}
 
 	log.Trace().Msg("Starting relays service")
-	if err := startRelays(ctx, comptrollerDB, monitor, scheduler, chainTime); err != nil {
+	if err := startRelays(ctx, comptrollerDB, monitor, scheduler); err != nil {
 		return errors.Wrap(err, "failed to start relays service")
 	}
 
@@ -269,7 +281,6 @@ func startRelays(
 	comptrollerDB comptrollerdb.Service,
 	monitor metrics.Service,
 	scheduler scheduler.Service,
-	chainTime chaintime.Service,
 ) error {
 	queuedProposerProviders := make([]relayclient.QueuedProposersProvider, 0)
 	for _, relayAddress := range viper.GetStringSlice("relays.addresses") {
@@ -361,7 +372,7 @@ func startBids(
 	return nil
 }
 
-func runCommands(ctx context.Context) {
+func runCommands(_ context.Context) {
 	if viper.GetBool("version") {
 		fmt.Printf("%s\n", ReleaseVersion)
 		os.Exit(0)

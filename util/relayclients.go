@@ -23,8 +23,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var relayClients map[string]relayclient.Service
-var relayClientsMu sync.Mutex
+var (
+	relayClients   map[string]relayclient.Service
+	relayClientsMu sync.Mutex
+)
 
 // FetchRelayClient fetches a relay client service, instantiating it if required.
 func FetchRelayClient(ctx context.Context, address string) (relayclient.Service, error) {
@@ -55,7 +57,7 @@ func FetchRelayClient(ctx context.Context, address string) (relayclient.Service,
 	return client, nil
 }
 
-func confirmRelayClientInterfaces(ctx context.Context, client relayclient.Service) error {
+func confirmRelayClientInterfaces(_ context.Context, client relayclient.Service) error {
 	if _, isProvider := client.(relayclient.QueuedProposersProvider); !isProvider {
 		return errors.New("client is not a QueuedProposersProvider")
 	}

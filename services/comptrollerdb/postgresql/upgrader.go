@@ -178,8 +178,7 @@ func (s *Service) version(ctx context.Context) (uint64, error) {
 
 // setVersion sets the version of the schema.
 func (s *Service) setVersion(ctx context.Context, version uint64) error {
-	tx := s.tx(ctx)
-	if tx == nil {
+	if tx := s.tx(ctx); tx == nil {
 		return ErrNoTransaction
 	}
 

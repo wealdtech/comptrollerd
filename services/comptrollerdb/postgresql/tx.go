@@ -20,11 +20,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	// ErrNoTransaction is returned when an attempt to carry out a mutation to the database
-	// is not inside a transaction.
-	ErrNoTransaction = errors.New("no transaction for action")
-)
+// ErrNoTransaction is returned when an attempt to carry out a mutation to the database
+// is not inside a transaction.
+var ErrNoTransaction = errors.New("no transaction for action")
 
 // Tx is a context tag for the database transaction.
 type Tx struct{}
@@ -56,7 +54,7 @@ func (s *Service) hasTx(ctx context.Context) bool {
 	return ok
 }
 
-// tx returns the transaction; nil if no transaction
+// tx returns the transaction; nil if no transaction.
 func (s *Service) tx(ctx context.Context) pgx.Tx {
 	if ctx == nil {
 		return nil

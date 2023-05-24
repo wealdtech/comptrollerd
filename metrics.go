@@ -23,8 +23,10 @@ import (
 
 var metricsNamespace = "comptrollerd"
 
-var releaseMetric *prometheus.GaugeVec
-var readyMetric prometheus.Gauge
+var (
+	releaseMetric *prometheus.GaugeVec
+	readyMetric   prometheus.Gauge
+)
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if releaseMetric != nil {
@@ -44,7 +46,7 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	return nil
 }
 
-func registerPrometheusMetrics(ctx context.Context) error {
+func registerPrometheusMetrics(_ context.Context) error {
 	startTime := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Name:      "start_time_secs",
@@ -77,7 +79,7 @@ func registerPrometheusMetrics(ctx context.Context) error {
 }
 
 // SetRelease is called when the release version is established.
-func setRelease(ctx context.Context, version string) {
+func setRelease(_ context.Context, version string) {
 	if releaseMetric == nil {
 		return
 	}
@@ -85,7 +87,7 @@ func setRelease(ctx context.Context, version string) {
 	releaseMetric.WithLabelValues(version).Set(1)
 }
 
-func setReady(ctx context.Context, ready bool) {
+func setReady(_ context.Context, ready bool) {
 	if readyMetric == nil {
 		return
 	}

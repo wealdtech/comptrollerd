@@ -81,7 +81,7 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	return s, nil
 }
 
-func (s *Service) updateOnScheduleTick(ctx context.Context, data interface{}) {
+func (s *Service) updateOnScheduleTick(ctx context.Context, _ interface{}) {
 	// Only allow 1 handler to be active.
 	acquired := s.activitySem.TryAcquire(1)
 	if !acquired {
@@ -106,6 +106,7 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 			log.Trace().Msg("No proposers")
 			// We consider a provider with no proposers to be inactive.
 			monitorRelayActive(provider.Address(), false)
+
 			continue
 		}
 		monitorRelayActive(provider.Address(), true)
@@ -128,6 +129,7 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 				registrations[0].GasLimit == proposer.Entry.Message.GasLimit {
 				log.Trace().Uint32("slot", slot).Str("fee_recipient", fmt.Sprintf("%#x", registrations[0].FeeRecipient)).Uint64("gas_limit", registrations[0].GasLimit).Msg("Duplicate; ignoring")
 				monitorRegistrationsProcessed(provider.Address())
+
 				continue
 			}
 
@@ -148,11 +150,13 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 			}); err != nil {
 				cancel()
 				log.Error().Err(err).Msg("Failed to set validator registration")
+
 				continue
 			}
 			if err := s.validatorRegistrationsSetter.CommitTx(ctx); err != nil {
 				cancel()
 				log.Error().Err(err).Msg("Failed to commit transaction")
+
 				continue
 			}
 			log.Trace().Str("relay", provider.Address()).Uint64("slot", uint64(proposer.Slot)).Str("pubkey", fmt.Sprintf("%#x", proposer.Entry.Message.Pubkey)).Str("fee_recipient", fmt.Sprintf("%#x", proposer.Entry.Message.FeeRecipient)).Msg("Stored validator registration")

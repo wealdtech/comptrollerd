@@ -14,6 +14,7 @@
 package standard
 
 import (
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/wealdtech/comptrollerd/services/metrics"
 	nullmetrics "github.com/wealdtech/comptrollerd/services/metrics/null"
@@ -53,6 +54,7 @@ func WithMonitor(monitor metrics.Service) Parameter {
 func parseAndCheckParameters(params ...Parameter) (*parameters, error) {
 	parameters := parameters{
 		logLevel: zerolog.GlobalLevel(),
+		monitor:  &nullmetrics.Service{},
 	}
 	for _, p := range params {
 		if params != nil {
@@ -61,7 +63,7 @@ func parseAndCheckParameters(params ...Parameter) (*parameters, error) {
 	}
 
 	if parameters.monitor == nil {
-		parameters.monitor = &nullmetrics.Service{}
+		return nil, errors.New("no monitor specified")
 	}
 
 	return &parameters, nil

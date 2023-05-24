@@ -23,8 +23,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var executionClients map[string]execclient.Service
-var executionClientsMu sync.Mutex
+var (
+	executionClients   map[string]execclient.Service
+	executionClientsMu sync.Mutex
+)
 
 // FetchExecutionClient fetches an execution client service, instantiating it if required.
 func FetchExecutionClient(ctx context.Context, address string) (execclient.Service, error) {
@@ -55,7 +57,7 @@ func FetchExecutionClient(ctx context.Context, address string) (execclient.Servi
 	return client, nil
 }
 
-func confirmExecutionClientInterfaces(ctx context.Context, client execclient.Service) error {
+func confirmExecutionClientInterfaces(_ context.Context, client execclient.Service) error {
 	if _, isProvider := client.(execclient.BlocksProvider); !isProvider {
 		return errors.New("client is not a BlocksProvider")
 	}

@@ -23,8 +23,10 @@ import (
 
 var metricsNamespace = "comptrollerd"
 
-var latestTime *prometheus.GaugeVec
-var relayActive *prometheus.GaugeVec
+var (
+	latestTime  *prometheus.GaugeVec
+	relayActive *prometheus.GaugeVec
+)
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if latestTime != nil {
@@ -41,7 +43,7 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	return nil
 }
 
-func registerPrometheusMetrics(ctx context.Context) error {
+func registerPrometheusMetrics(_ context.Context) error {
 	latestTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "relays",

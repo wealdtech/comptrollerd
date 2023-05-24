@@ -159,7 +159,9 @@ LIMIT $%d`, len(queryVals)))
 		if payments[i].Height != payments[j].Height {
 			return payments[i].Height < payments[j].Height
 		}
+
 		return bytes.Compare(payments[i].Hash, payments[j].Hash) < 0
 	})
+
 	return payments, nil
 }

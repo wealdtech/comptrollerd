@@ -141,5 +141,6 @@ LIMIT $%d`, len(queryVals)))
 	sort.Slice(alternateBids, func(i int, j int) bool {
 		return alternateBids[i].Slot < alternateBids[j].Slot
 	})
+
 	return alternateBids, nil
 }

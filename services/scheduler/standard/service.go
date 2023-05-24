@@ -86,8 +86,7 @@ func (s *Service) ScheduleJob(ctx context.Context,
 	}
 
 	s.jobsMutex.Lock()
-	_, exists := s.jobs[name]
-	if exists {
+	if _, exists := s.jobs[name]; exists {
 		s.jobsMutex.Unlock()
 		return scheduler.ErrJobAlreadyExists
 	}
@@ -170,8 +169,7 @@ func (s *Service) SchedulePeriodicJob(ctx context.Context,
 	}
 
 	s.jobsMutex.Lock()
-	_, exists := s.jobs[name]
-	if exists {
+	if _, exists := s.jobs[name]; exists {
 		s.jobsMutex.Unlock()
 		return scheduler.ErrJobAlreadyExists
 	}
@@ -188,7 +186,7 @@ func (s *Service) SchedulePeriodicJob(ctx context.Context,
 	go func() {
 		for {
 			runtime, err := runtimeFunc(ctx, runtimeData)
-			if err == scheduler.ErrNoMoreInstances {
+			if errors.Is(err, scheduler.ErrNoMoreInstances) {
 				s.log.Trace().Str("job", name).Msg("No more instances; period job stopping")
 				s.jobsMutex.Lock()
 				delete(s.jobs, name)
@@ -285,7 +283,7 @@ func (s *Service) RunJobIfExists(ctx context.Context, name string) {
 }
 
 // JobExists returns true if a job exists.
-func (s *Service) JobExists(ctx context.Context, name string) bool {
+func (s *Service) JobExists(_ context.Context, name string) bool {
 	s.jobsMutex.RLock()
 	_, exists := s.jobs[name]
 	s.jobsMutex.RUnlock()
@@ -293,7 +291,7 @@ func (s *Service) JobExists(ctx context.Context, name string) bool {
 }
 
 // ListJobs returns the names of all jobs.
-func (s *Service) ListJobs(ctx context.Context) []string {
+func (s *Service) ListJobs(_ context.Context) []string {
 	s.jobsMutex.RLock()
 	names := make([]string, 0, len(s.jobs))
 	for name := range s.jobs {
@@ -306,7 +304,7 @@ func (s *Service) ListJobs(ctx context.Context) []string {
 
 // CancelJob removes a named job.
 // If the job does not exist it will return an appropriate error.
-func (s *Service) CancelJob(ctx context.Context, name string) error {
+func (s *Service) CancelJob(_ context.Context, name string) error {
 	s.jobsMutex.Lock()
 	job, exists := s.jobs[name]
 	if !exists {
@@ -367,7 +365,7 @@ func finaliseJob(job *job) {
 }
 
 // runJob runs the given job.
-func (s *Service) runJob(ctx context.Context, job *job) error {
+func (s *Service) runJob(_ context.Context, job *job) error {
 	job.stateLock.Lock()
 	if job.active.Load() {
 		job.stateLock.Unlock()

@@ -24,9 +24,11 @@ import (
 
 var metricsNamespace = "comptrollerd"
 
-var latestTime prometheus.Gauge
-var betterBids *prometheus.GaugeVec
-var underpaidBids *prometheus.GaugeVec
+var (
+	latestTime    prometheus.Gauge
+	betterBids    *prometheus.GaugeVec
+	underpaidBids *prometheus.GaugeVec
+)
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if latestTime != nil {
@@ -43,7 +45,7 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	return nil
 }
 
-func registerPrometheusMetrics(ctx context.Context) error {
+func registerPrometheusMetrics(_ context.Context) error {
 	latestTime = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "blockpayments",

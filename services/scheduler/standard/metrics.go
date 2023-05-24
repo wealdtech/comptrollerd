@@ -22,9 +22,11 @@ import (
 
 var metricsNamespace = "scheduler"
 
-var schedulerJobsScheduled *prometheus.CounterVec
-var schedulerJobsCancelled *prometheus.CounterVec
-var schedulerJobsStarted *prometheus.CounterVec
+var (
+	schedulerJobsScheduled *prometheus.CounterVec
+	schedulerJobsCancelled *prometheus.CounterVec
+	schedulerJobsStarted   *prometheus.CounterVec
+)
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if schedulerJobsScheduled != nil {
@@ -38,10 +40,11 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if monitor.Presenter() == "prometheus" {
 		return registerPrometheusMetrics(ctx)
 	}
+
 	return nil
 }
 
-func registerPrometheusMetrics(ctx context.Context) error {
+func registerPrometheusMetrics(_ context.Context) error {
 	schedulerJobsScheduled = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "jobs",

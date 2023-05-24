@@ -116,6 +116,7 @@ func (s *Service) handleReceivedBids(ctx context.Context, slot phase0.Slot) erro
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -147,5 +148,6 @@ func (s *Service) handleDeliveredBids(ctx context.Context, slot phase0.Slot) err
 			return errors.Wrap(err, "failed to set delivered bid")
 		}
 	}
+
 	return nil
 }
