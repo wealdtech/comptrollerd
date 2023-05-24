@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2023 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -70,6 +70,19 @@ FROM t_block_payments`)
 		queryVals = append(queryVals, *filter.ToHeight)
 		queryBuilder.WriteString(fmt.Sprintf(`
 %s f_height <= $%d`, wherestr, len(queryVals)))
+	}
+
+	if filter.FromSlot != nil {
+		queryVals = append(queryVals, *filter.FromSlot)
+		queryBuilder.WriteString(fmt.Sprintf(`
+%s f_slot >= $%d`, wherestr, len(queryVals)))
+		wherestr = "  AND"
+	}
+
+	if filter.ToSlot != nil {
+		queryVals = append(queryVals, *filter.ToSlot)
+		queryBuilder.WriteString(fmt.Sprintf(`
+%s f_slot <= $%d`, wherestr, len(queryVals)))
 	}
 
 	// 	if len(filter.FeeRecipients) != 0 {
