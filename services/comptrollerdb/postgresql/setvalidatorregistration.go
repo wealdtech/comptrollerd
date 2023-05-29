@@ -18,10 +18,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
+	"go.opentelemetry.io/otel"
 )
 
 // SetValidatorRegistration sets a validator registration.
 func (s *Service) SetValidatorRegistration(ctx context.Context, registration *comptrollerdb.ValidatorRegistration) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "SetValidatorRegistration")
+	defer span.End()
+
 	if registration == nil {
 		return errors.New("registration nil")
 	}

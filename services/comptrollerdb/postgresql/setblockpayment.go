@@ -19,10 +19,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
+	"go.opentelemetry.io/otel"
 )
 
 // SetBlockPayment sets a block payment.
 func (s *Service) SetBlockPayment(ctx context.Context, payment *comptrollerdb.BlockPayment) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "SetBlockPayment")
+	defer span.End()
+
 	if payment == nil {
 		return errors.New("payment nil")
 	}

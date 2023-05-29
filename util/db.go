@@ -108,6 +108,7 @@ func InitComptrollerDB(ctx context.Context, majordomo majordomo.Service) (*postg
 		postgresqlcomptrollerdb.WithUser(viper.GetString("comptrollerdb.user")),
 		postgresqlcomptrollerdb.WithPassword(viper.GetString("comptrollerdb.password")),
 		postgresqlcomptrollerdb.WithPort(viper.GetInt32("comptrollerdb.port")),
+		postgresqlcomptrollerdb.WithMaxConnections(viper.GetUint("comptrollerdb.max-connections")),
 	}
 
 	if viper.GetString("comptrollerdb.client-cert") != "" {

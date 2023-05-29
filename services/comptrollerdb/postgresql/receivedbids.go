@@ -20,10 +20,40 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
+	"go.opentelemetry.io/otel"
 )
+
+// LatestReceivedBidSlot provides the slot of the latest received bid in the database.
+func (s *Service) LatestReceivedBidSlot(ctx context.Context) (phase0.Slot, error) {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "LatestReceivedBidSlot")
+	defer span.End()
+
+	var err error
+
+	tx := s.tx(ctx)
+	if tx == nil {
+		ctx, err = s.BeginROTx(ctx)
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to begin transaction")
+		}
+		tx = s.tx(ctx)
+		defer s.CommitROTx(ctx)
+	}
+
+	var latest uint64
+	err = tx.QueryRow(ctx, `
+SELECT MAX(f_slot)
+FROM t_received_bids`).Scan(&latest)
+	if err != nil {
+		return 0, err
+	}
+
+	return phase0.Slot(latest), nil
+}
 
 // ReceivedBids returns received bids matching the supplied filter.
 func (s *Service) ReceivedBids(ctx context.Context,
@@ -34,12 +64,12 @@ func (s *Service) ReceivedBids(ctx context.Context,
 ) {
 	tx := s.tx(ctx)
 	if tx == nil {
-		ctx, cancel, err := s.BeginTx(ctx)
+		ctx, err := s.BeginROTx(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to begin transaction")
 		}
 		tx = s.tx(ctx)
-		defer cancel()
+		defer s.CommitROTx(ctx)
 	}
 
 	// Build the query.

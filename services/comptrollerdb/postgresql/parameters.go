@@ -20,14 +20,15 @@ import (
 )
 
 type parameters struct {
-	logLevel   zerolog.Level
-	server     string
-	port       int32
-	user       string
-	password   string
-	clientCert []byte
-	clientKey  []byte
-	caCert     []byte
+	logLevel       zerolog.Level
+	server         string
+	port           int32
+	user           string
+	password       string
+	clientCert     []byte
+	clientKey      []byte
+	caCert         []byte
+	maxConnections uint
 }
 
 // Parameter is the interface for service parameters.
@@ -76,6 +77,13 @@ func WithPort(port int32) Parameter {
 	})
 }
 
+// WithMaxConnections sets the maximum number of connections for the database pool.
+func WithMaxConnections(maxConnections uint) Parameter {
+	return parameterFunc(func(p *parameters) {
+		p.maxConnections = maxConnections
+	})
+}
+
 // WithClientCert sets the bytes of the client TLS certificate.
 func WithClientCert(cert []byte) Parameter {
 	return parameterFunc(func(p *parameters) {
@@ -100,7 +108,8 @@ func WithCACert(cert []byte) Parameter {
 // parseAndCheckParameters parses and checks parameters to ensure that mandatory parameters are present and correct.
 func parseAndCheckParameters(params ...Parameter) (*parameters, error) {
 	parameters := parameters{
-		logLevel: zerolog.GlobalLevel(),
+		logLevel:       zerolog.GlobalLevel(),
+		maxConnections: 16,
 	}
 	for _, p := range params {
 		if params != nil {
@@ -116,6 +125,9 @@ func parseAndCheckParameters(params ...Parameter) (*parameters, error) {
 	}
 	if parameters.port == 0 {
 		return nil, errors.New("no port specified")
+	}
+	if parameters.maxConnections == 0 {
+		return nil, errors.New("no maximum pool connections specified")
 	}
 
 	return &parameters, nil

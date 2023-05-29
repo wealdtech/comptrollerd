@@ -15,6 +15,8 @@ package comptrollerdb
 
 import (
 	"context"
+
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 )
 
 // Service defines a minimal comptroller database service.
@@ -34,6 +36,9 @@ type Service interface {
 
 // AlternateBidsProvider defines functions to provide alternate bid information.
 type AlternateBidsProvider interface {
+	// LatestAlternateBidSlot provides the slot of the latest alternate bid in the database.
+	LatestAlternateBidSlot(ctx context.Context) (phase0.Slot, error)
+
 	// AtlernateBids returns alternat bids matching the supplied filter.
 	AtlernateBids(ctx context.Context, filter *AlternateBidFilter) ([]*AlternateBid, error)
 }
@@ -48,6 +53,9 @@ type AlternateBidsSetter interface {
 
 // BlockPaymentsProvider defines functions to provide block payment information.
 type BlockPaymentsProvider interface {
+	// LatestBlockPaymentSlot provides the slot of the latest block payment in the database.
+	LatestBlockPaymentSlot(ctx context.Context) (phase0.Slot, error)
+
 	// BlockPayments returns block payments matching the supplied filter.
 	BlockPayments(ctx context.Context, filter *BlockPaymentFilter) ([]*BlockPayment, error)
 }
@@ -64,6 +72,9 @@ type BlockPaymentsSetter interface {
 type ReceivedBidsProvider interface {
 	Service
 
+	// LatestReceivedBidSlot provides the slot of the latest received bid in the database.
+	LatestReceivedBidSlot(ctx context.Context) (phase0.Slot, error)
+
 	// ReceivedBids returns received bids matching the supplied filter.
 	ReceivedBids(ctx context.Context, filter *ReceivedBidFilter) ([]*ReceivedBid, error)
 }
@@ -72,6 +83,9 @@ type ReceivedBidsProvider interface {
 type ReceivedBidsSetter interface {
 	Service
 
+	// SetReceivedBids sets multiple bid traces.
+	SetReceivedBids(ctx context.Context, bids []*ReceivedBid) error
+
 	// SetReceivedBid sets a bid trace.
 	SetReceivedBid(ctx context.Context, bid *ReceivedBid) error
 }
@@ -79,6 +93,9 @@ type ReceivedBidsSetter interface {
 // DeliveredBidsProvider defines functions to provide delivered bids.
 type DeliveredBidsProvider interface {
 	Service
+
+	// LatestDeliveredBidSlot provides the slot of the latest delivered bid in the database.
+	LatestDeliveredBidSlot(ctx context.Context) (phase0.Slot, error)
 
 	// DeliveredBids returns delivered bids matching the supplied filter.
 	DeliveredBids(ctx context.Context, filter *DeliveredBidFilter) ([]*DeliveredBid, error)
@@ -95,6 +112,9 @@ type DeliveredBidsSetter interface {
 // ValidatorRegistrationsProvider defines functions to provide validator registration information.
 type ValidatorRegistrationsProvider interface {
 	Service
+
+	// LatestValidatorRegistrationSlot provides the slot of the latest validator registration in the database.
+	LatestValidatorRegistrationSlot(ctx context.Context) (phase0.Slot, error)
 
 	// ValidatorRegistrations returns validator registrations matching the supplied filter.
 	ValidatorRegistrations(ctx context.Context, filter *ValidatorRegistrationFilter) ([]*ValidatorRegistration, error)

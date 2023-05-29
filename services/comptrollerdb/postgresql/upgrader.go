@@ -127,12 +127,13 @@ func (s *Service) Upgrade(ctx context.Context) error {
 func (s *Service) tableExists(ctx context.Context, tableName string) (bool, error) {
 	tx := s.tx(ctx)
 	if tx == nil {
-		ctx, cancel, err := s.BeginTx(ctx)
+		ctx, err := s.BeginROTx(ctx)
 		if err != nil {
 			return false, errors.Wrap(err, "failed to begin transaction")
 		}
 		tx = s.tx(ctx)
-		defer cancel()
+		//nolint:errcheck
+		defer s.CommitTx(ctx)
 	}
 
 	rows, err := tx.Query(ctx, `SELECT true

@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2023 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,10 +19,14 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 )
 
 // SetMetadata sets a metadata key to a JSON value.
 func (s *Service) SetMetadata(ctx context.Context, key string, value []byte) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "SetMetadata")
+	defer span.End()
+
 	tx := s.tx(ctx)
 	if tx == nil {
 		return ErrNoTransaction
@@ -44,25 +48,30 @@ SET f_value = excluded.f_value`,
 
 // Metadata obtains the JSON value from a metadata key.
 func (s *Service) Metadata(ctx context.Context, key string) ([]byte, error) {
-	if !s.hasTx(ctx) {
-		var cancel context.CancelFunc
-		var err error
-		ctx, cancel, err = s.BeginTx(ctx)
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "Metadata")
+	defer span.End()
+
+	var err error
+
+	tx := s.tx(ctx)
+	if tx == nil {
+		ctx, err = s.BeginROTx(ctx)
 		if err != nil {
 			return nil, err
 		}
-		defer cancel()
+		tx = s.tx(ctx)
+		defer s.CommitROTx(ctx)
 	}
-	tx := s.tx(ctx)
 
 	res := &pgtype.JSONB{}
-	err := tx.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 SELECT f_value
 FROM t_metadata
 WHERE f_key = $1`,
 		key).Scan(
 		res,
 	)
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

@@ -81,6 +81,8 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 		}
 	}
 
+	dsnItems = append(dsnItems, fmt.Sprintf("pool_max_conns=%d", parameters.maxConnections))
+
 	config, err := pgxpool.ParseConfig(strings.Join(dsnItems, " "))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate pgx config")

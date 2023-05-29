@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/attestantio/go-eth2-client v0.16.3
 	github.com/attestantio/go-execution-client v0.8.2
-	github.com/attestantio/go-relay-client v0.2.4
+	github.com/attestantio/go-relay-client v0.2.5
 	github.com/aws/aws-sdk-go v1.44.271
 	github.com/jackc/pgtype v1.14.0
 	github.com/jackc/pgx/v4 v4.18.1
@@ -25,6 +25,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0
 	go.opentelemetry.io/otel/sdk v1.16.0
+	go.opentelemetry.io/otel/trace v1.16.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/sync v0.2.0
 	google.golang.org/grpc v1.55.0
@@ -87,7 +88,6 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
-	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect

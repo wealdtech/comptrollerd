@@ -19,10 +19,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
+	"go.opentelemetry.io/otel"
 )
 
 // SetDeliveredBid sets a bid delivered by a relay.
 func (s *Service) SetDeliveredBid(ctx context.Context, bid *comptrollerdb.DeliveredBid) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "SetDeliveredBid")
+	defer span.End()
+
 	if bid == nil {
 		return errors.New("bid nil")
 	}

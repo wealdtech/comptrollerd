@@ -137,6 +137,7 @@ func fetchConfig() error {
 	pflag.Int64("bids.start-slot", -1, "First slot for which to obtain or re-obtain bids")
 	pflag.Int64("blockpayments.start-slot", -1, "First slot for which to calculate or re-calculate block payments")
 	pflag.Int64("blockpayments.replay-slot", -1, "Replay block payments for a single slot and then exit")
+	pflag.Uint("comptrollerdb.max-connections", 32, "maximum number of concurrent database connections")
 	pflag.Parse()
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		return errors.Wrap(err, "failed to bind pflags to viper")

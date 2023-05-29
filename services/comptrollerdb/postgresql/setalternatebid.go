@@ -19,10 +19,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
+	"go.opentelemetry.io/otel"
 )
 
 // SetAlternateBid sets an alternate bid.
 func (s *Service) SetAlternateBid(ctx context.Context, alternateBid *comptrollerdb.AlternateBid) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "SetAlternateBid")
+	defer span.End()
+
 	if alternateBid == nil {
 		return errors.New("alternate bid nil")
 	}
