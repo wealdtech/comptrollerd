@@ -176,7 +176,7 @@ func fetchConfig() error {
 			// we have the information from elsewhere (e.g. environment variables).  Check
 			// to see if we have a comptroller server configured, as if not we aren't going to
 			// get very far anyway.
-			if viper.GetString("comptrollerdb.server") == "" {
+			if viper.Get("version") == nil && viper.GetString("comptrollerdb.server") == "" {
 				// Assume the underlying issue is that the configuration file is missing.
 				return errors.Wrap(err, "could not find the configuration file")
 			}
