@@ -16,6 +16,7 @@ package standard
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -155,7 +156,18 @@ func (s *Service) handleReceivedBids(ctx context.Context, slot phase0.Slot) erro
 		return errors.New("failed to handle slot")
 	}
 
-	if err := s.receivedBidsSetter.SetReceivedBids(ctx, bids); err != nil {
+	// Some relays return multiple copies of the same bid, so filter them out.
+	filteredBidsMap := make(map[string]struct{})
+	filteredBids := make([]*comptrollerdb.ReceivedBid, 0, len(bids))
+	for _, bid := range bids {
+		key := fmt.Sprintf("%d:%s:%#x:%#x:%#x:%d", bid.Slot, bid.Relay, bid.ParentHash, bid.BlockHash, bid.BuilderPubkey, bid.Timestamp.UnixNano())
+		if _, exists := filteredBidsMap[key]; !exists {
+			filteredBidsMap[key] = struct{}{}
+			filteredBids = append(filteredBids, bid)
+		}
+	}
+
+	if err := s.receivedBidsSetter.SetReceivedBids(ctx, filteredBids); err != nil {
 		return errors.Wrap(err, "failed to set received bids")
 	}
 
