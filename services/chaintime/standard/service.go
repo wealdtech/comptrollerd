@@ -17,6 +17,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/api"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -43,16 +44,17 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	// Set logging.
 	log = zerologger.With().Str("service", "chaintime").Str("impl", "standard").Logger().Level(parameters.logLevel)
 
-	genesisTime, err := parameters.genesisTimeProvider.GenesisTime(ctx)
+	genesisResponse, err := parameters.genesisProvider.Genesis(ctx, &api.GenesisOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to obtain genesis time")
+		return nil, errors.Wrap(err, "failed to obtain genesis")
 	}
-	log.Trace().Time("genesis_time", genesisTime).Msg("Obtained genesis time")
+	log.Trace().Time("genesis_time", genesisResponse.Data.GenesisTime).Msg("Obtained genesis time")
 
-	spec, err := parameters.specProvider.Spec(ctx)
+	specResponse, err := parameters.specProvider.Spec(ctx, &api.SpecOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to obtain spec")
 	}
+	spec := specResponse.Data
 
 	tmp, exists := spec["SECONDS_PER_SLOT"]
 	if !exists {
@@ -73,7 +75,7 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	}
 
 	s := &Service{
-		genesisTime:   genesisTime,
+		genesisTime:   genesisResponse.Data.GenesisTime,
 		slotDuration:  slotDuration,
 		slotsPerEpoch: slotsPerEpoch,
 	}
@@ -120,8 +122,8 @@ func (s *Service) FirstSlotOfEpoch(epoch phase0.Epoch) phase0.Slot {
 	return phase0.Slot(uint64(epoch) * s.slotsPerEpoch)
 }
 
-// SlotOfTimestamp provides the slot of the given timestamp.
-func (s *Service) SlotOfTimestamp(timestamp time.Time) phase0.Slot {
+// TimestampToSlot provides the slot of the given timestamp.
+func (s *Service) TimestampToSlot(timestamp time.Time) phase0.Slot {
 	if timestamp.Before(s.genesisTime) {
 		return 0
 	}
@@ -130,8 +132,8 @@ func (s *Service) SlotOfTimestamp(timestamp time.Time) phase0.Slot {
 	return phase0.Slot(secondsSinceGenesis / uint64(s.slotDuration.Seconds()))
 }
 
-// EpochOfTimestamp provides the epoch of the given timestamp.
-func (s *Service) EpochOfTimestamp(timestamp time.Time) phase0.Epoch {
+// TimestampToEpoch provides the epoch of the given timestamp.
+func (s *Service) TimestampToEpoch(timestamp time.Time) phase0.Epoch {
 	if timestamp.Before(s.genesisTime) {
 		return 0
 	}

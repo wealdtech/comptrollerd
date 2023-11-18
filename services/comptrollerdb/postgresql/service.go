@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2020 - 2023 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -20,16 +20,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgtype"
-	shopspring "github.com/jackc/pgtype/ext/shopspring-numeric"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
+	zerologadapter "github.com/jackc/pgx-zerolog"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	zerologger "github.com/rs/zerolog/log"
 )
 
-// Service is an comptroller database service.
+// Service is a comptroller database service.
 type Service struct {
 	pool *pgxpool.Pool
 }
@@ -47,52 +48,9 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	// Set logging.
 	log = zerologger.With().Str("service", "comptrollerdb").Str("impl", "postgresql").Logger().Level(parameters.logLevel)
 
-	var pool *pgxpool.Pool
-	dsnItems := make([]string, 0, 16)
-	dsnItems = append(dsnItems, fmt.Sprintf("host=%s", parameters.server))
-	dsnItems = append(dsnItems, fmt.Sprintf("user=%s", parameters.user))
-	if parameters.password != "" {
-		dsnItems = append(dsnItems, fmt.Sprintf("password=%s", parameters.password))
-	}
-	dsnItems = append(dsnItems, fmt.Sprintf("port=%d", parameters.port))
-
-	var tlsConfig *tls.Config
-	if parameters.caCert != nil || parameters.clientCert != nil {
-		dsnItems = append(dsnItems, "sslmode=verify-full")
-
-		// Add TLS configuration.
-		tlsConfig = &tls.Config{
-			ServerName: parameters.server,
-			MinVersion: tls.VersionTLS13,
-		}
-		if parameters.clientCert != nil {
-			clientPair, err := tls.X509KeyPair(parameters.clientCert, parameters.clientKey)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to create client certificate")
-			}
-			tlsConfig.Certificates = []tls.Certificate{clientPair}
-		}
-		if parameters.caCert != nil {
-			rootCAs := x509.NewCertPool()
-			if !rootCAs.AppendCertsFromPEM(parameters.caCert) {
-				return nil, errors.New("failed to append root CA certificates")
-			}
-			tlsConfig.RootCAs = rootCAs
-		}
-	}
-
-	dsnItems = append(dsnItems, fmt.Sprintf("pool_max_conns=%d", parameters.maxConnections))
-
-	config, err := pgxpool.ParseConfig(strings.Join(dsnItems, " "))
+	pool, err := newFromComponents(ctx, parameters, log)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate pgx config")
-	}
-	config.AfterConnect = registerCustomTypes
-	config.ConnConfig.TLSConfig = tlsConfig
-
-	pool, err = pgxpool.ConnectConfig(ctx, config)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to database")
+		return nil, err
 	}
 
 	go func() {
@@ -108,11 +66,70 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	return s, nil
 }
 
+func newFromComponents(ctx context.Context,
+	parameters *parameters,
+	log zerolog.Logger,
+) (
+	*pgxpool.Pool,
+	error,
+) {
+	dsnItems := make([]string, 0, 16)
+	dsnItems = append(dsnItems,
+		fmt.Sprintf("host=%s", parameters.server),
+		fmt.Sprintf("user=%s", parameters.user),
+	)
+	if parameters.password != "" {
+		dsnItems = append(dsnItems, fmt.Sprintf("password=%s", parameters.password))
+	}
+	dsnItems = append(dsnItems, fmt.Sprintf("port=%d", parameters.port))
+
+	var tlsConfig *tls.Config
+	if parameters.caCert != nil || parameters.clientCert != nil {
+		dsnItems = append(dsnItems, "sslmode=verify-full")
+
+		// Add TLS configuration.
+		tlsConfig = &tls.Config{
+			ServerName: parameters.server,
+			MinVersion: tls.VersionTLS13,
+		}
+	}
+	if parameters.clientCert != nil {
+		clientPair, err := tls.X509KeyPair(parameters.clientCert, parameters.clientKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create client certificate")
+		}
+		tlsConfig.Certificates = []tls.Certificate{clientPair}
+	}
+	if parameters.caCert != nil {
+		rootCAs := x509.NewCertPool()
+		if !rootCAs.AppendCertsFromPEM(parameters.caCert) {
+			return nil, errors.New("failed to append root CA certificates")
+		}
+		tlsConfig.RootCAs = rootCAs
+	}
+
+	dsnItems = append(dsnItems, fmt.Sprintf("pool_max_conns=%d", parameters.maxConnections))
+
+	config, err := pgxpool.ParseConfig(strings.Join(dsnItems, " "))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate pgx config")
+	}
+
+	config.AfterConnect = registerCustomTypes
+	config.ConnConfig.TLSConfig = tlsConfig
+	config.ConnConfig.Tracer = &tracelog.TraceLog{Logger: zerologadapter.NewLogger(log)}
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to database")
+	}
+
+	return pool, nil
+}
+
+// skipcq: RVV-B0012
 func registerCustomTypes(_ context.Context, conn *pgx.Conn) error {
-	conn.ConnInfo().RegisterDataType(pgtype.DataType{
-		Value: &shopspring.Numeric{},
-		Name:  "numeric",
-		OID:   pgtype.NumericOID,
-	})
+	pgxdecimal.Register(conn.TypeMap())
+
 	return nil
 }

@@ -42,9 +42,9 @@ type Service interface {
 	// FirstSlotOfEpoch provides the first slot of the given epoch.
 	FirstSlotOfEpoch(epoch phase0.Epoch) phase0.Slot
 
-	// SlotOfTimestamp provides the slot of the given timestamp.
-	SlotOfTimestamp(timestamp time.Time) phase0.Slot
+	// TimestampToSlot provides the slot of the given timestamp.
+	TimestampToSlot(timestamp time.Time) phase0.Slot
 
-	// EpochOfTimestamp provides the epoch of the given timestamp.
-	EpochOfTimestamp(timestamp time.Time) phase0.Epoch
+	// TimestampToEpoch provides the epoch of the given timestamp.
+	TimestampToEpoch(timestamp time.Time) phase0.Epoch
 }

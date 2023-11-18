@@ -51,7 +51,7 @@ import (
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.2.9"
+var ReleaseVersion = "0.2.10"
 
 func main() {
 	os.Exit(main2())
@@ -240,7 +240,7 @@ func startServices(ctx context.Context, monitor metrics.Service, majordomo major
 
 	chainTime, err := standardchaintime.New(ctx,
 		standardchaintime.WithLogLevel(util.LogLevel("chaintime")),
-		standardchaintime.WithGenesisTimeProvider(consensusClient.(consensusclient.GenesisTimeProvider)),
+		standardchaintime.WithGenesisProvider(consensusClient.(consensusclient.GenesisProvider)),
 		standardchaintime.WithSpecProvider(consensusClient.(consensusclient.SpecProvider)),
 		standardchaintime.WithForkScheduleProvider(consensusClient.(consensusclient.ForkScheduleProvider)),
 	)
