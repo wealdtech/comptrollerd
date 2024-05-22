@@ -92,7 +92,7 @@ func (s *Service) onStart(ctx context.Context,
 	s.catchup(ctx, md)
 	log.Trace().Msg("Finished initial catchup")
 
-	runtimeFunc := func(ctx context.Context, data interface{}) (time.Time, error) {
+	runtimeFunc := func(_ context.Context, _ any) (time.Time, error) {
 		return time.Now().Add(s.interval), nil
 	}
 
@@ -110,7 +110,7 @@ func (s *Service) onStart(ctx context.Context,
 	return nil
 }
 
-func (s *Service) onTick(ctx context.Context, _ interface{}) {
+func (s *Service) onTick(ctx context.Context, _ any) {
 	// Only allow 1 handler to be active.
 	acquired := s.activitySem.TryAcquire(1)
 	if !acquired {

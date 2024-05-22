@@ -76,7 +76,7 @@ func (s *Service) ScheduleJob(ctx context.Context,
 	name string,
 	runtime time.Time,
 	jobFunc scheduler.JobFunc,
-	data interface{},
+	data any,
 ) error {
 	if name == "" {
 		return scheduler.ErrNoJobName
@@ -154,9 +154,9 @@ func (s *Service) SchedulePeriodicJob(ctx context.Context,
 	class string,
 	name string,
 	runtimeFunc scheduler.RuntimeFunc,
-	runtimeData interface{},
+	runtimeData any,
 	jobFunc scheduler.JobFunc,
-	jobData interface{},
+	jobData any,
 ) error {
 	if name == "" {
 		return scheduler.ErrNoJobName
@@ -193,6 +193,7 @@ func (s *Service) SchedulePeriodicJob(ctx context.Context,
 				s.jobsMutex.Unlock()
 				finaliseJob(job)
 				jobCancelled(class)
+
 				return
 			}
 			if err != nil {
@@ -202,6 +203,7 @@ func (s *Service) SchedulePeriodicJob(ctx context.Context,
 				s.jobsMutex.Unlock()
 				finaliseJob(job)
 				jobCancelled(class)
+
 				return
 			}
 			s.log.Trace().Str("job", name).Time("scheduled", runtime).Msg("Scheduled job")
@@ -213,11 +215,13 @@ func (s *Service) SchedulePeriodicJob(ctx context.Context,
 				s.jobsMutex.Unlock()
 				finaliseJob(job)
 				jobCancelled(class)
+
 				return
 			case <-job.cancelCh:
 				s.log.Trace().Str("job", name).Time("scheduled", runtime).Msg("Cancel triggered; job not running")
 				finaliseJob(job)
 				jobCancelled(class)
+
 				return
 			case <-job.runCh:
 				s.log.Trace().Str("job", name).Time("scheduled", runtime).Msg("Run triggered; job running")
@@ -287,6 +291,7 @@ func (s *Service) JobExists(_ context.Context, name string) bool {
 	s.jobsMutex.RLock()
 	_, exists := s.jobs[name]
 	s.jobsMutex.RUnlock()
+
 	return exists
 }
 
@@ -365,7 +370,9 @@ func finaliseJob(job *job) {
 }
 
 // runJob runs the given job.
-func (s *Service) runJob(_ context.Context, job *job) error {
+//
+//nolint:revive
+func (*Service) runJob(_ context.Context, job *job) error {
 	job.stateLock.Lock()
 	if job.active.Load() {
 		job.stateLock.Unlock()

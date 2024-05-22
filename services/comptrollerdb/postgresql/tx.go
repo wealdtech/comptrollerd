@@ -51,6 +51,7 @@ func (s *Service) BeginTx(ctx context.Context) (context.Context, context.CancelF
 	ctx = context.WithValue(ctx, &TxID{}, id)
 
 	log.Trace().Str("trace", fmt.Sprintf("%+v", errors.New("stack"))).Msg("Transaction started")
+
 	return ctx, func() {
 		if err := tx.Rollback(ctx); err != nil {
 			log.Debug().Err(err).Str("trace", fmt.Sprintf("%+v", errors.Wrap(err, "stack"))).Msg("Failed to rollback transaction")
@@ -70,7 +71,11 @@ func (s *Service) BeginROTx(ctx context.Context) (context.Context, error) {
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	if err != nil {
-		log.Trace().Err(err).Str("trace", fmt.Sprintf("+%v", errors.Wrap(err, "stack"))).Msg("Failed to begin read-only transaction")
+		log.Trace().
+			Err(err).
+			Str("trace", fmt.Sprintf("+%v", errors.Wrap(err, "stack"))).
+			Msg("Failed to begin read-only transaction")
+
 		return nil, errors.Wrap(err, "failed to begin read-only transaction")
 	}
 
@@ -78,6 +83,7 @@ func (s *Service) BeginROTx(ctx context.Context) (context.Context, error) {
 	ctx = context.WithValue(ctx, &TxID{}, id)
 
 	log.Trace().Str("trace", fmt.Sprintf("%+v", errors.New("stack"))).Msg("Read-only transaction started")
+
 	return ctx, nil
 }
 
@@ -90,6 +96,7 @@ func (*Service) tx(ctx context.Context) pgx.Tx {
 	if tx, ok := ctx.Value(&Tx{}).(pgx.Tx); ok {
 		return tx
 	}
+
 	return nil
 }
 
@@ -102,6 +109,7 @@ func (*Service) txID(ctx context.Context) string {
 	if txID, ok := ctx.Value(&TxID{}).(string); ok {
 		return txID
 	}
+
 	return "<unknown>"
 }
 
@@ -126,6 +134,7 @@ func (s *Service) CommitTx(ctx context.Context) error {
 	}
 
 	log.Trace().Str("trace", fmt.Sprintf("%+v", errors.New("stack"))).Msg("Transaction committed")
+
 	return nil
 }
 

@@ -14,4 +14,4 @@
 package blockpayments
 
 // Service defines a service that calculates block payment information from bids.
-type Service interface{}
+type Service any

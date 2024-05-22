@@ -14,4 +14,4 @@
 package relays
 
 // Service defines a relays service.
-type Service interface{}
+type Service any

@@ -48,7 +48,10 @@ func (s *Service) Upgrade(ctx context.Context) error {
 		return errors.Wrap(err, "failed to obtain version")
 	}
 
-	log.Trace().Uint64("current_version", version).Uint64("required_version", currentVersion).Msg("Checking if database upgrade is required")
+	log.Trace().
+		Uint64("current_version", version).
+		Uint64("required_version", currentVersion).
+		Msg("Checking if database upgrade is required")
 	if version == currentVersion {
 		// Nothing to do.
 		return nil
@@ -154,6 +157,7 @@ WHERE table_schema = (SELECT current_schema())
 			return false, errors.Wrap(err, "failed to scan row")
 		}
 	}
+
 	return found, nil
 }
 

@@ -54,8 +54,8 @@ func (s *Service) SetReceivedBids(ctx context.Context, bids []*comptrollerdb.Rec
 			"f_gas_used",
 			"f_value",
 		},
-		pgx.CopyFromSlice(len(bids), func(i int) ([]interface{}, error) {
-			return []interface{}{
+		pgx.CopyFromSlice(len(bids), func(i int) ([]any, error) {
+			return []any{
 				bids[i].Slot,
 				bids[i].Relay,
 				bids[i].ParentHash,

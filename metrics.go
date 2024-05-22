@@ -43,6 +43,7 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	case "null":
 		log.Debug().Msg("No metrics will be generated for this module")
 	}
+
 	return nil
 }
 
@@ -87,6 +88,7 @@ func setRelease(_ context.Context, version string) {
 	releaseMetric.WithLabelValues(version).Set(1)
 }
 
+//nolint:revive
 func setReady(_ context.Context, ready bool) {
 	if readyMetric == nil {
 		return

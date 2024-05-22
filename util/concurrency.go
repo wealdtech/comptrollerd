@@ -35,5 +35,6 @@ func ProcessConcurrency(path string) int64 {
 	if lastPeriod == -1 {
 		return ProcessConcurrency("")
 	}
+
 	return ProcessConcurrency(path[0:lastPeriod])
 }

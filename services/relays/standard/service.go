@@ -64,7 +64,7 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 		activitySem:                    semaphore.NewWeighted(1),
 	}
 
-	runtimeFunc := func(ctx context.Context, data interface{}) (time.Time, error) {
+	runtimeFunc := func(_ context.Context, _ any) (time.Time, error) {
 		return time.Now().Add(s.interval), nil
 	}
 
@@ -78,10 +78,11 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 	); err != nil {
 		log.Fatal().Err(err).Msg("Failed to schedule queued proposer updates.")
 	}
+
 	return s, nil
 }
 
-func (s *Service) updateOnScheduleTick(ctx context.Context, _ interface{}) {
+func (s *Service) updateOnScheduleTick(ctx context.Context, _ any) {
 	// Only allow 1 handler to be active.
 	acquired := s.activitySem.TryAcquire(1)
 	if !acquired {
@@ -127,7 +128,11 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 			if len(registrations) == 1 &&
 				bytes.Equal(registrations[0].FeeRecipient, proposer.Entry.Message.FeeRecipient[:]) &&
 				registrations[0].GasLimit == proposer.Entry.Message.GasLimit {
-				log.Trace().Uint32("slot", slot).Str("fee_recipient", fmt.Sprintf("%#x", registrations[0].FeeRecipient)).Uint64("gas_limit", registrations[0].GasLimit).Msg("Duplicate; ignoring")
+				log.Trace().
+					Uint32("slot", slot).
+					Str("fee_recipient", fmt.Sprintf("%#x", registrations[0].FeeRecipient)).
+					Uint64("gas_limit", registrations[0].GasLimit).
+					Msg("Duplicate; ignoring")
 				monitorRegistrationsProcessed(provider.Address())
 
 				continue
@@ -159,7 +164,12 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 
 				continue
 			}
-			log.Trace().Str("relay", provider.Address()).Uint64("slot", uint64(proposer.Slot)).Str("pubkey", fmt.Sprintf("%#x", proposer.Entry.Message.Pubkey)).Str("fee_recipient", fmt.Sprintf("%#x", proposer.Entry.Message.FeeRecipient)).Msg("Stored validator registration")
+			log.Trace().
+				Str("relay", provider.Address()).
+				Uint64("slot", uint64(proposer.Slot)).
+				Stringer("pubkey", proposer.Entry.Message.Pubkey).
+				Stringer("fee_recipient", proposer.Entry.Message.FeeRecipient).
+				Msg("Stored validator registration")
 			monitorRegistrationsProcessed(provider.Address())
 		}
 	}

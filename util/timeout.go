@@ -36,5 +36,6 @@ func Timeout(path string) time.Duration {
 	if lastPeriod == -1 {
 		return Timeout("")
 	}
+
 	return Timeout(path[0:lastPeriod])
 }

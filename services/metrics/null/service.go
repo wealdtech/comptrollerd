@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -17,6 +17,6 @@ package null
 type Service struct{}
 
 // Presenter provides the presenter for this service.
-func (s *Service) Presenter() string {
+func (*Service) Presenter() string {
 	return "null"
 }

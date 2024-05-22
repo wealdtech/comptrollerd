@@ -71,6 +71,7 @@ func registerPrometheusMetrics(_ context.Context) error {
 		Name:      "started_total",
 		Help:      "The number of scheduled jobs started.",
 	}, []string{"class", "trigger"})
+
 	return prometheus.Register(schedulerJobsStarted)
 }
 

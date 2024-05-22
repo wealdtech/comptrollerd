@@ -120,17 +120,31 @@ func (s *Service) handleReceivedBids(ctx context.Context, slot phase0.Slot) erro
 			defer wg.Done()
 			traces, err := provider.ReceivedBidTraces(ctx, slot)
 			if err != nil {
-				log.Error().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).Err(err).Msg("Failed to obtain received bid traces")
+				log.Error().
+					Str("provider", provider.Address()).
+					Uint64("slot", uint64(slot)).
+					Err(err).
+					Msg("Failed to obtain received bid traces")
 				atomic.AddInt32(&errs, 1)
+
 				return
 			}
 			data, err := json.Marshal(traces)
 			if err != nil {
-				log.Error().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).Err(err).Msg("Failed to unmarshal received bid traces")
+				log.Error().
+					Str("provider", provider.Address()).
+					Uint64("slot", uint64(slot)).
+					Err(err).
+					Msg("Failed to unmarshal received bid traces")
 				atomic.AddInt32(&errs, 1)
+
 				return
 			}
-			log.Trace().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).RawJSON("bid_traces", data).Msg("Obtained received bid traces")
+			log.Trace().
+				Str("provider", provider.Address()).
+				Uint64("slot", uint64(slot)).
+				RawJSON("bid_traces", data).
+				Msg("Obtained received bid traces")
 
 			bidsMu.Lock()
 			for _, trace := range traces {
@@ -160,7 +174,14 @@ func (s *Service) handleReceivedBids(ctx context.Context, slot phase0.Slot) erro
 	filteredBidsMap := make(map[string]struct{})
 	filteredBids := make([]*comptrollerdb.ReceivedBid, 0, len(bids))
 	for _, bid := range bids {
-		key := fmt.Sprintf("%d:%s:%#x:%#x:%#x:%d", bid.Slot, bid.Relay, bid.ParentHash, bid.BlockHash, bid.BuilderPubkey, bid.Timestamp.UnixNano())
+		key := fmt.Sprintf("%d:%s:%#x:%#x:%#x:%d",
+			bid.Slot,
+			bid.Relay,
+			bid.ParentHash,
+			bid.BlockHash,
+			bid.BuilderPubkey,
+			bid.Timestamp.UnixNano(),
+		)
 		if _, exists := filteredBidsMap[key]; !exists {
 			filteredBidsMap[key] = struct{}{}
 			filteredBids = append(filteredBids, bid)
@@ -189,21 +210,39 @@ func (s *Service) handleDeliveredBids(ctx context.Context, slot phase0.Slot) err
 			defer wg.Done()
 			trace, err := provider.DeliveredBidTrace(ctx, slot)
 			if err != nil {
-				log.Error().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).Err(err).Msg("Failed to obtain delivered bid trace")
+				log.Error().
+					Str("provider", provider.Address()).
+					Uint64("slot", uint64(slot)).
+					Err(err).
+					Msg("Failed to obtain delivered bid trace")
 				atomic.AddInt32(&errs, 1)
+
 				return
 			}
 			if trace == nil {
-				log.Trace().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).Msg("No delivered bid trace")
+				log.Trace().
+					Str("provider", provider.Address()).
+					Uint64("slot", uint64(slot)).
+					Msg("No delivered bid trace")
+
 				return
 			}
 			data, err := json.Marshal(trace)
 			if err != nil {
-				log.Error().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).Err(err).Msg("Failed to unmarshal delivered bid trace")
+				log.Error().
+					Str("provider", provider.Address()).
+					Uint64("slot", uint64(slot)).
+					Err(err).
+					Msg("Failed to unmarshal delivered bid trace")
 				atomic.AddInt32(&errs, 1)
+
 				return
 			}
-			log.Trace().Str("provider", provider.Address()).Uint64("slot", uint64(slot)).RawJSON("bid_trace", data).Msg("Obtained delivered bid trace")
+			log.Trace().
+				Str("provider", provider.Address()).
+				Uint64("slot", uint64(slot)).
+				RawJSON("bid_trace", data).
+				Msg("Obtained delivered bid trace")
 
 			bidsMu.Lock()
 			bids = append(bids, &comptrollerdb.DeliveredBid{
@@ -228,7 +267,12 @@ func (s *Service) handleDeliveredBids(ctx context.Context, slot phase0.Slot) err
 
 	for _, bid := range bids {
 		if err := s.deliveredBidsSetter.SetDeliveredBid(ctx, bid); err != nil {
-			log.Error().Str("provider", bid.Relay).Uint64("slot", uint64(slot)).Err(err).Msg("Failed to set delivered bid")
+			log.Error().
+				Str("provider", bid.Relay).
+				Uint64("slot", uint64(slot)).
+				Err(err).
+				Msg("Failed to set delivered bid")
+
 			return errors.Wrap(err, "failed to set delivered bid")
 		}
 	}

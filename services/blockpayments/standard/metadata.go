@@ -43,6 +43,7 @@ func (s *Service) getMetadata(ctx context.Context) (*metadata, error) {
 	if err := json.Unmarshal(mdJSON, md); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal metadata")
 	}
+
 	return md, nil
 }
 
@@ -55,5 +56,6 @@ func (s *Service) setMetadata(ctx context.Context, md *metadata) error {
 	if err := s.blockPaymentsSetter.SetMetadata(ctx, metadataKey, mdJSON); err != nil {
 		return errors.Wrap(err, "failed to update metadata")
 	}
+
 	return nil
 }

@@ -40,6 +40,7 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if monitor.Presenter() == "prometheus" {
 		return registerPrometheusMetrics(ctx)
 	}
+
 	return nil
 }
 
@@ -73,6 +74,7 @@ func monitorRegistrationsProcessed(relay string) {
 	}
 }
 
+//nolint:revive
 func monitorRelayActive(relay string, active bool) {
 	if relayActive != nil {
 		if active {

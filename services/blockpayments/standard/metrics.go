@@ -26,8 +26,8 @@ var metricsNamespace = "comptrollerd"
 
 var (
 	latestTime    prometheus.Gauge
-	betterBids    *prometheus.GaugeVec
-	underpaidBids *prometheus.GaugeVec
+	betterBids    *prometheus.CounterVec
+	underpaidBids *prometheus.CounterVec
 )
 
 func registerMetrics(ctx context.Context, monitor metrics.Service) error {
@@ -42,6 +42,7 @@ func registerMetrics(ctx context.Context, monitor metrics.Service) error {
 	if monitor.Presenter() == "prometheus" {
 		return registerPrometheusMetrics(ctx)
 	}
+
 	return nil
 }
 
@@ -55,7 +56,7 @@ func registerPrometheusMetrics(_ context.Context) error {
 	if err := prometheus.Register(latestTime); err != nil {
 		return errors.Wrap(err, "failed to register latest timestamp")
 	}
-	betterBids = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	betterBids = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "blockpayments",
 		Name:      "better_bids_total",
@@ -64,7 +65,7 @@ func registerPrometheusMetrics(_ context.Context) error {
 	if err := prometheus.Register(betterBids); err != nil {
 		return errors.Wrap(err, "failed to register better bids")
 	}
-	underpaidBids = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	underpaidBids = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "blockpayments",
 		Name:      "underpaid_bids_total",

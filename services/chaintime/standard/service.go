@@ -128,8 +128,7 @@ func (s *Service) TimestampToSlot(timestamp time.Time) phase0.Slot {
 		return 0
 	}
 
-	secondsSinceGenesis := uint64(timestamp.Sub(s.genesisTime).Seconds())
-	return phase0.Slot(secondsSinceGenesis / uint64(s.slotDuration.Seconds()))
+	return phase0.Slot(uint64(timestamp.Sub(s.genesisTime).Seconds()) / uint64(s.slotDuration.Seconds()))
 }
 
 // TimestampToEpoch provides the epoch of the given timestamp.
@@ -138,6 +137,5 @@ func (s *Service) TimestampToEpoch(timestamp time.Time) phase0.Epoch {
 		return 0
 	}
 
-	secondsSinceGenesis := uint64(timestamp.Sub(s.genesisTime).Seconds())
-	return phase0.Epoch(secondsSinceGenesis / uint64(s.slotDuration.Seconds()) / s.slotsPerEpoch)
+	return phase0.Epoch(uint64(timestamp.Sub(s.genesisTime).Seconds()) / uint64(s.slotDuration.Seconds()) / s.slotsPerEpoch)
 }

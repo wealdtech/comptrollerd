@@ -28,7 +28,8 @@ import (
 
 // LatestValidatorRegistrationSlot provides the slot of the latest validator registration in the database.
 func (s *Service) LatestValidatorRegistrationSlot(ctx context.Context) (phase0.Slot, error) {
-	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").Start(ctx, "LatestValidatorRegistrationSlot")
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.comptrollerdb.postgresql").
+		Start(ctx, "LatestValidatorRegistrationSlot")
 	defer span.End()
 
 	var err error
@@ -73,9 +74,9 @@ func (s *Service) ValidatorRegistrations(ctx context.Context,
 
 	// Build the query.
 	queryBuilder := strings.Builder{}
-	queryVals := make([]interface{}, 0)
+	queryVals := make([]any, 0)
 
-	queryBuilder.WriteString(`
+	_, _ = queryBuilder.WriteString(`
 SELECT f_slot
       ,f_relay
       ,f_validator_pubkey
@@ -89,42 +90,42 @@ FROM t_validator_registrations`)
 
 	if len(filter.Relays) > 0 {
 		queryVals = append(queryVals, filter.Relays)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_relay = ANY($%d)`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if filter.FromSlot != nil {
 		queryVals = append(queryVals, *filter.FromSlot)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_slot >= $%d`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if filter.ToSlot != nil {
 		queryVals = append(queryVals, *filter.ToSlot)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_slot <= $%d`, wherestr, len(queryVals)))
 	}
 
 	if len(filter.FeeRecipients) > 0 {
 		queryVals = append(queryVals, filter.FeeRecipients)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_fee_recipient = ANY($%d)`, wherestr, len(queryVals)))
 	}
 
 	if len(filter.ValidatorPubkeys) > 0 {
 		queryVals = append(queryVals, filter.ValidatorPubkeys)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_validator_pubkey = ANY($%d)`, wherestr, len(queryVals)))
 	}
 
 	switch filter.Order {
 	case comptrollerdb.OrderEarliest:
-		queryBuilder.WriteString(`
+		_, _ = queryBuilder.WriteString(`
 ORDER BY f_slot,f_relay,f_validator_pubkey`)
 	case comptrollerdb.OrderLatest:
-		queryBuilder.WriteString(`
+		_, _ = queryBuilder.WriteString(`
 ORDER BY f_slot DESC,f_relay DESC,f_validator_pubkey DESC`)
 	default:
 		return nil, errors.New("no order specified")
@@ -132,7 +133,7 @@ ORDER BY f_slot DESC,f_relay DESC,f_validator_pubkey DESC`)
 
 	if filter.Limit != 0 {
 		queryVals = append(queryVals, filter.Limit)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 LIMIT $%d`, len(queryVals)))
 	}
 
@@ -141,7 +142,7 @@ LIMIT $%d`, len(queryVals)))
 		for i := range queryVals {
 			params[i] = fmt.Sprintf("%v", queryVals[i])
 		}
-		log.Trace().Str("query", strings.ReplaceAll(queryBuilder.String(), "\n", " ")).Strs("params", params).Msg("SQL query")
+		e.Str("query", strings.ReplaceAll(queryBuilder.String(), "\n", " ")).Strs("params", params).Msg("SQL query")
 	}
 
 	rows, err := tx.Query(ctx,
@@ -179,7 +180,9 @@ LIMIT $%d`, len(queryVals)))
 		if x := strings.Compare(registrations[i].Relay, registrations[j].Relay); x != 0 {
 			return x < 0
 		}
+
 		return bytes.Compare(registrations[i].ValidatorPubkey, registrations[j].ValidatorPubkey) < 0
 	})
+
 	return registrations, nil
 }

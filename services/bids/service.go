@@ -20,7 +20,7 @@ import (
 )
 
 // Service defines a service that obtains bid information from relays.
-type Service interface{}
+type Service any
 
 // ReceivedHandler defines the interface for handlers triggered by received bids.
 type ReceivedHandler interface {

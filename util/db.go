@@ -1,4 +1,4 @@
-// Copyright © 2022, 2023 Weald Technology Trading.
+// Copyright © 2022 - 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -25,7 +25,7 @@ import (
 )
 
 // InitExecDB initialises the exec database.
-func InitExecDB(ctx context.Context, majordomo majordomo.Service) (execdb.Service, error) {
+func InitExecDB(ctx context.Context, majordomoSvc majordomo.Service) (execdb.Service, error) {
 	opts := []postgresqlexecdb.Parameter{
 		postgresqlexecdb.WithLogLevel(LogLevel("execdb")),
 		postgresqlexecdb.WithServer(viper.GetString("execdb.server")),
@@ -35,7 +35,7 @@ func InitExecDB(ctx context.Context, majordomo majordomo.Service) (execdb.Servic
 	}
 
 	if viper.GetString("execdb.client-cert") != "" {
-		clientCert, err := majordomo.Fetch(ctx, viper.GetString("execdb.client-cert"))
+		clientCert, err := majordomoSvc.Fetch(ctx, viper.GetString("execdb.client-cert"))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read client certificate")
 		}
@@ -43,7 +43,7 @@ func InitExecDB(ctx context.Context, majordomo majordomo.Service) (execdb.Servic
 	}
 
 	if viper.GetString("execdb.client-key") != "" {
-		clientKey, err := majordomo.Fetch(ctx, viper.GetString("execdb.client-key"))
+		clientKey, err := majordomoSvc.Fetch(ctx, viper.GetString("execdb.client-key"))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read client key")
 		}
@@ -51,7 +51,7 @@ func InitExecDB(ctx context.Context, majordomo majordomo.Service) (execdb.Servic
 	}
 
 	if viper.GetString("execdb.ca-cert") != "" {
-		caCert, err := majordomo.Fetch(ctx, viper.GetString("execdb.ca-cert"))
+		caCert, err := majordomoSvc.Fetch(ctx, viper.GetString("execdb.ca-cert"))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read certificate authority certificate")
 		}
@@ -62,7 +62,7 @@ func InitExecDB(ctx context.Context, majordomo majordomo.Service) (execdb.Servic
 }
 
 // InitComptrollerDB initialises the comptroller database.
-func InitComptrollerDB(ctx context.Context, majordomo majordomo.Service) (*postgresqlcomptrollerdb.Service, error) {
+func InitComptrollerDB(ctx context.Context, majordomoSvc majordomo.Service) (*postgresqlcomptrollerdb.Service, error) {
 	opts := []postgresqlcomptrollerdb.Parameter{
 		postgresqlcomptrollerdb.WithLogLevel(LogLevel("comptrollerdb")),
 		postgresqlcomptrollerdb.WithServer(viper.GetString("comptrollerdb.server")),
@@ -73,7 +73,7 @@ func InitComptrollerDB(ctx context.Context, majordomo majordomo.Service) (*postg
 	}
 
 	if viper.GetString("comptrollerdb.client-cert") != "" {
-		clientCert, err := majordomo.Fetch(ctx, viper.GetString("comptrollerdb.client-cert"))
+		clientCert, err := majordomoSvc.Fetch(ctx, viper.GetString("comptrollerdb.client-cert"))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read client certificate")
 		}
@@ -81,7 +81,7 @@ func InitComptrollerDB(ctx context.Context, majordomo majordomo.Service) (*postg
 	}
 
 	if viper.GetString("comptrollerdb.client-key") != "" {
-		clientKey, err := majordomo.Fetch(ctx, viper.GetString("comptrollerdb.client-key"))
+		clientKey, err := majordomoSvc.Fetch(ctx, viper.GetString("comptrollerdb.client-key"))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read client key")
 		}
@@ -89,7 +89,7 @@ func InitComptrollerDB(ctx context.Context, majordomo majordomo.Service) (*postg
 	}
 
 	if viper.GetString("comptrollerdb.ca-cert") != "" {
-		caCert, err := majordomo.Fetch(ctx, viper.GetString("comptrollerdb.ca-cert"))
+		caCert, err := majordomoSvc.Fetch(ctx, viper.GetString("comptrollerdb.ca-cert"))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read certificate authority certificate")
 		}

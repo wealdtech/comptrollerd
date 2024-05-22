@@ -73,9 +73,9 @@ func (s *Service) AlternateBids(ctx context.Context,
 
 	// Build the query.
 	queryBuilder := strings.Builder{}
-	queryVals := make([]interface{}, 0)
+	queryVals := make([]any, 0)
 
-	queryBuilder.WriteString(`
+	_, _ = queryBuilder.WriteString(`
 SELECT f_slot
       ,f_selected_relay
       ,f_selected_value
@@ -87,38 +87,38 @@ FROM t_alternate_bids`)
 
 	if filter.FromSlot != nil {
 		queryVals = append(queryVals, *filter.FromSlot)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_slot >= $%d`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if filter.ToSlot != nil {
 		queryVals = append(queryVals, *filter.ToSlot)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_slot <= $%d`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if len(filter.SelectedRelays) != 0 {
 		queryVals = append(queryVals, filter.SelectedRelays)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_selected_relay = ANY($%d)`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if len(filter.BestRelays) != 0 {
 		queryVals = append(queryVals, filter.BestRelays)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_best_relay = ANY($%d)`, wherestr, len(queryVals)))
 		// wherestr = "  AND"
 	}
 
 	switch filter.Order {
 	case comptrollerdb.OrderEarliest:
-		queryBuilder.WriteString(`
+		_, _ = queryBuilder.WriteString(`
 ORDER BY f_slot`)
 	case comptrollerdb.OrderLatest:
-		queryBuilder.WriteString(`
+		_, _ = queryBuilder.WriteString(`
 ORDER BY f_slot DESC`)
 	default:
 		return nil, errors.New("no order specified")
@@ -126,7 +126,7 @@ ORDER BY f_slot DESC`)
 
 	if filter.Limit != 0 {
 		queryVals = append(queryVals, filter.Limit)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 LIMIT $%d`, len(queryVals)))
 	}
 
@@ -135,7 +135,7 @@ LIMIT $%d`, len(queryVals)))
 		for i := range queryVals {
 			params[i] = fmt.Sprintf("%v", queryVals[i])
 		}
-		log.Trace().Str("query", strings.ReplaceAll(queryBuilder.String(), "\n", " ")).Strs("params", params).Msg("SQL query")
+		e.Str("query", strings.ReplaceAll(queryBuilder.String(), "\n", " ")).Strs("params", params).Msg("SQL query")
 	}
 
 	rows, err := tx.Query(ctx,

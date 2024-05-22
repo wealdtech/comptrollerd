@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -29,7 +29,7 @@ import (
 
 // InitMajordomo initialises the majordomo service, for fetching secrets.
 func InitMajordomo(ctx context.Context) (majordomo.Service, error) {
-	majordomo, err := standardmajordomo.New(ctx,
+	majordomoSvc, err := standardmajordomo.New(ctx,
 		standardmajordomo.WithLogLevel(LogLevel("majordomo")),
 	)
 	if err != nil {
@@ -42,7 +42,7 @@ func InitMajordomo(ctx context.Context) (majordomo.Service, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create direct confidant")
 	}
-	if err := majordomo.RegisterConfidant(ctx, directConfidant); err != nil {
+	if err := majordomoSvc.RegisterConfidant(ctx, directConfidant); err != nil {
 		return nil, errors.Wrap(err, "failed to register direct confidant")
 	}
 
@@ -52,14 +52,18 @@ func InitMajordomo(ctx context.Context) (majordomo.Service, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create file confidant")
 	}
-	if err := majordomo.RegisterConfidant(ctx, fileConfidant); err != nil {
+	if err := majordomoSvc.RegisterConfidant(ctx, fileConfidant); err != nil {
 		return nil, errors.Wrap(err, "failed to register file confidant")
 	}
 
 	if viper.GetString("majordomo.asm.region") != "" {
 		var asmCredentials *credentials.Credentials
 		if viper.GetString("majordomo.asm.id") != "" {
-			asmCredentials = credentials.NewStaticCredentials(viper.GetString("majordomo.asm.id"), viper.GetString("ma  jordomo.asm.secret"), "")
+			asmCredentials = credentials.NewStaticCredentials(
+				viper.GetString("majordomo.asm.id"),
+				viper.GetString("ma  jordomo.asm.secret"),
+				"",
+			)
 		}
 		asmConfidant, err := asmconfidant.New(ctx,
 			asmconfidant.WithLogLevel(LogLevel("majordomo.confidants.asm")),
@@ -69,7 +73,7 @@ func InitMajordomo(ctx context.Context) (majordomo.Service, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create AWS secrets manager confidant")
 		}
-		if err := majordomo.RegisterConfidant(ctx, asmConfidant); err != nil {
+		if err := majordomoSvc.RegisterConfidant(ctx, asmConfidant); err != nil {
 			return nil, errors.Wrap(err, "failed to register AWS secrets manager confidant")
 		}
 	}
@@ -87,10 +91,10 @@ func InitMajordomo(ctx context.Context) (majordomo.Service, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Google secrets manager confidant")
 		}
-		if err := majordomo.RegisterConfidant(ctx, gsmConfidant); err != nil {
+		if err := majordomoSvc.RegisterConfidant(ctx, gsmConfidant); err != nil {
 			return nil, errors.Wrap(err, "failed to register Google secrets manager confidant")
 		}
 	}
 
-	return majordomo, nil
+	return majordomoSvc, nil
 }

@@ -51,7 +51,7 @@ import (
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.2.10"
+var ReleaseVersion = "0.2.11-dev"
 
 func main() {
 	os.Exit(main2())
@@ -66,7 +66,7 @@ func main2() int {
 		return 1
 	}
 
-	majordomo, err := util.InitMajordomo(ctx)
+	majordomoSvc, err := util.InitMajordomo(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialise majordomo: %v\n", err)
 		return 1
@@ -83,7 +83,7 @@ func main2() int {
 	logModules()
 	log.Info().Str("version", ReleaseVersion).Msg("Starting comptrollerd")
 
-	if err := initTracing(ctx, majordomo); err != nil {
+	if err := initTracing(ctx, majordomoSvc); err != nil {
 		log.Error().Err(err).Msg("Failed to initialise tracing")
 		return 1
 	}
@@ -103,7 +103,7 @@ func main2() int {
 	setRelease(ctx, ReleaseVersion)
 	setReady(ctx, false)
 
-	if err := startServices(ctx, monitor, majordomo); err != nil {
+	if err := startServices(ctx, monitor, majordomoSvc); err != nil {
 		log.Error().Err(err).Msg("Failed to initialise services")
 		return 1
 	}
@@ -122,6 +122,7 @@ func main2() int {
 	}
 
 	log.Info().Msg("Stopping comptrollerd")
+
 	return 0
 }
 
@@ -201,22 +202,25 @@ func startMonitor(ctx context.Context) (metrics.Service, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to start prometheus metrics service")
 		}
-		log.Info().Str("listen_address", viper.GetString("metrics.prometheus.listen-address")).Msg("Started prometheus metrics service")
+		log.Info().
+			Str("listen_address", viper.GetString("metrics.prometheus.listen-address")).
+			Msg("Started prometheus metrics service")
 	} else {
 		log.Debug().Msg("No metrics service supplied; monitor not starting")
 		monitor = &nullmetrics.Service{}
 	}
+
 	return monitor, nil
 }
 
-func startServices(ctx context.Context, monitor metrics.Service, majordomo majordomo.Service) error {
+func startServices(ctx context.Context, monitor metrics.Service, majordomoSvc majordomo.Service) error {
 	log.Trace().Msg("Starting execution database")
-	execDB, err := util.InitExecDB(ctx, majordomo)
+	execDB, err := util.InitExecDB(ctx, majordomoSvc)
 	if err != nil {
 		return errors.Wrap(err, "failed to start execution database")
 	}
 
-	comptrollerDB, err := util.InitComptrollerDB(ctx, majordomo)
+	comptrollerDB, err := util.InitComptrollerDB(ctx, majordomoSvc)
 	if err != nil {
 		return errors.Wrap(err, "failed to start comptroller database")
 	}
@@ -225,7 +229,7 @@ func startServices(ctx context.Context, monitor metrics.Service, majordomo major
 		return errors.Wrap(err, "failed to upgrade comptroller database")
 	}
 
-	scheduler, err := standardscheduler.New(ctx,
+	schedulerSvc, err := standardscheduler.New(ctx,
 		standardscheduler.WithLogLevel(util.LogLevel("scheduler")),
 		standardscheduler.WithMonitor(monitor),
 	)
@@ -249,12 +253,12 @@ func startServices(ctx context.Context, monitor metrics.Service, majordomo major
 	}
 
 	log.Trace().Msg("Starting bids service")
-	if err := startBids(ctx, comptrollerDB, monitor, scheduler, chainTime, execDB); err != nil {
+	if err := startBids(ctx, comptrollerDB, monitor, schedulerSvc, chainTime, execDB); err != nil {
 		return errors.Wrap(err, "failed to start bids service")
 	}
 
 	log.Trace().Msg("Starting relays service")
-	if err := startRelays(ctx, comptrollerDB, monitor, scheduler); err != nil {
+	if err := startRelays(ctx, comptrollerDB, monitor, schedulerSvc); err != nil {
 		return errors.Wrap(err, "failed to start relays service")
 	}
 
@@ -281,7 +285,7 @@ func startRelays(
 	ctx context.Context,
 	comptrollerDB comptrollerdb.Service,
 	monitor metrics.Service,
-	scheduler scheduler.Service,
+	schedulerSvc scheduler.Service,
 ) error {
 	queuedProposerProviders := make([]relayclient.QueuedProposersProvider, 0)
 	for _, relayAddress := range viper.GetStringSlice("relays.addresses") {
@@ -295,7 +299,7 @@ func startRelays(
 	_, err := standardrelays.New(ctx,
 		standardrelays.WithLogLevel(util.LogLevel("relays")),
 		standardrelays.WithMonitor(monitor),
-		standardrelays.WithScheduler(scheduler),
+		standardrelays.WithScheduler(schedulerSvc),
 		standardrelays.WithQueuedProposersProviders(queuedProposerProviders),
 		standardrelays.WithValidatorRegistrationsProvider(comptrollerDB.(comptrollerdb.ValidatorRegistrationsProvider)),
 		standardrelays.WithValidatorRegistrationsSetter(comptrollerDB.(comptrollerdb.ValidatorRegistrationsSetter)),
@@ -312,7 +316,7 @@ func startBids(
 	ctx context.Context,
 	comptrollerDB comptrollerdb.Service,
 	monitor metrics.Service,
-	scheduler scheduler.Service,
+	schedulerSvc scheduler.Service,
 	chainTime chaintime.Service,
 	execDB execdb.Service,
 ) error {
@@ -357,7 +361,7 @@ func startBids(
 	if _, err := standardbids.New(ctx,
 		standardbids.WithLogLevel(util.LogLevel("bids")),
 		standardbids.WithMonitor(monitor),
-		standardbids.WithScheduler(scheduler),
+		standardbids.WithScheduler(schedulerSvc),
 		standardbids.WithChainTime(chainTime),
 		standardbids.WithDeliveredBidTraceProviders(deliveredBidTraceProviders),
 		standardbids.WithReceivedBidTracesProviders(receivedBidTracesProviders),
@@ -375,7 +379,8 @@ func startBids(
 
 func runCommands(_ context.Context) {
 	if viper.GetBool("version") {
-		fmt.Printf("%s\n", ReleaseVersion)
+		fmt.Fprintf(os.Stdout, "%s\n", ReleaseVersion)
+		//nolint:revive
 		os.Exit(0)
 	}
 }

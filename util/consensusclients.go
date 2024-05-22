@@ -52,5 +52,6 @@ func FetchConsensusClient(ctx context.Context, address string) (consensusclient.
 		}
 		consensusClients[address] = client
 	}
+
 	return client, nil
 }

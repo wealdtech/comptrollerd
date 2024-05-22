@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -36,7 +36,7 @@ type parameters struct {
 
 // Parameter is the interface for service parameters.
 type Parameter interface {
-	apply(*parameters)
+	apply(p *parameters)
 }
 
 type parameterFunc func(*parameters)
@@ -60,9 +60,9 @@ func WithMonitor(monitor metrics.Service) Parameter {
 }
 
 // WithScheduler sets the scheduler for the module.
-func WithScheduler(scheduler scheduler.Service) Parameter {
+func WithScheduler(schedulerSvc scheduler.Service) Parameter {
 	return parameterFunc(func(p *parameters) {
-		p.scheduler = scheduler
+		p.scheduler = schedulerSvc
 	})
 }
 

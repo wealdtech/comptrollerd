@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,7 +18,7 @@ import (
 	"sync"
 
 	execclient "github.com/attestantio/go-execution-client"
-	jsonrpc "github.com/attestantio/go-execution-client/jsonrpc"
+	"github.com/attestantio/go-execution-client/jsonrpc"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )

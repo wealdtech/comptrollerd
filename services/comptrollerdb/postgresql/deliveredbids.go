@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -74,9 +74,9 @@ func (s *Service) DeliveredBids(ctx context.Context,
 
 	// Build the query.
 	queryBuilder := strings.Builder{}
-	queryVals := make([]interface{}, 0)
+	queryVals := make([]any, 0)
 
-	queryBuilder.WriteString(`
+	_, _ = queryBuilder.WriteString(`
 SELECT f_slot
       ,f_relay
       ,f_parent_hash
@@ -93,52 +93,52 @@ FROM t_delivered_bids`)
 
 	if filter.FromSlot != nil {
 		queryVals = append(queryVals, *filter.FromSlot)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_slot >= $%d`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if filter.ToSlot != nil {
 		queryVals = append(queryVals, *filter.ToSlot)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_slot <= $%d`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if len(filter.Relays) > 0 {
 		queryVals = append(queryVals, filter.Relays)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_relay = ANY($%d)`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if len(filter.ProposerFeeRecipients) > 0 {
 		queryVals = append(queryVals, filter.ProposerFeeRecipients)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_proposer_fee_recipient = ANY($%d)`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if len(filter.BuilderPubkeys) > 0 {
 		queryVals = append(queryVals, filter.BuilderPubkeys)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_builder_pubkey = ANY($%d)`, wherestr, len(queryVals)))
 		wherestr = "  AND"
 	}
 
 	if len(filter.ProposerPubkeys) > 0 {
 		queryVals = append(queryVals, filter.ProposerPubkeys)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_proposer_pubkey = ANY($%d)`, wherestr, len(queryVals)))
 		// wherestr = "  AND"
 	}
 
 	switch filter.Order {
 	case comptrollerdb.OrderEarliest:
-		queryBuilder.WriteString(`
+		_, _ = queryBuilder.WriteString(`
 ORDER BY f_slot,f_relay,f_parent_hash,f_block_hash,f_builder_pubkey`)
 	case comptrollerdb.OrderLatest:
-		queryBuilder.WriteString(`
+		_, _ = queryBuilder.WriteString(`
 ORDER BY f_slot DESC,f_relay DESC,f_parent_hash DESC,f_block_hash DESC,f_builder_pubkey DESC`)
 	default:
 		return nil, errors.New("no order specified")
@@ -146,7 +146,7 @@ ORDER BY f_slot DESC,f_relay DESC,f_parent_hash DESC,f_block_hash DESC,f_builder
 
 	if filter.Limit != 0 {
 		queryVals = append(queryVals, filter.Limit)
-		queryBuilder.WriteString(fmt.Sprintf(`
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 LIMIT $%d`, len(queryVals)))
 	}
 
@@ -155,7 +155,7 @@ LIMIT $%d`, len(queryVals)))
 		for i := range queryVals {
 			params[i] = fmt.Sprintf("%v", queryVals[i])
 		}
-		log.Trace().Str("query", strings.ReplaceAll(queryBuilder.String(), "\n", " ")).Strs("params", params).Msg("SQL query")
+		e.Str("query", strings.ReplaceAll(queryBuilder.String(), "\n", " ")).Strs("params", params).Msg("SQL query")
 	}
 
 	rows, err := tx.Query(ctx,
@@ -201,7 +201,9 @@ LIMIT $%d`, len(queryVals)))
 		if cmp := strings.Compare(bids[i].Relay, bids[j].Relay); cmp != 0 {
 			return cmp < 0
 		}
+
 		return bytes.Compare(bids[i].ProposerPubkey, bids[j].ProposerPubkey) < 0
 	})
+
 	return bids, nil
 }
