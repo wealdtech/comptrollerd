@@ -28,7 +28,7 @@ import (
 )
 
 func (s *Service) catchup(ctx context.Context, md *metadata) {
-	log.Info().Msg("Catching up")
+	log.Trace().Msg("Catching up")
 	// We fetch up to, but not including, the current slot.
 	var wg sync.WaitGroup
 	for i, provider := range s.receivedBidTracesProviders {
@@ -36,7 +36,7 @@ func (s *Service) catchup(ctx context.Context, md *metadata) {
 		go s.catchupProvider(ctx, &wg, md, provider.Name(), i)
 	}
 	wg.Wait()
-	log.Info().Msg("Caught up")
+	log.Trace().Msg("Caught up")
 }
 
 func (s *Service) catchupProvider(ctx context.Context,
@@ -52,7 +52,7 @@ func (s *Service) catchupProvider(ctx context.Context,
 	))
 	defer span.End()
 
-	log.Info().Str("provider", provider).Int("provider_index", providerIndex).Msg("Catching up for provider")
+	log.Trace().Str("provider", provider).Int("provider_index", providerIndex).Msg("Catching up for provider")
 	md.mu.RLock()
 	firstSlot := phase0.Slot(md.LatestSlots[provider] + 1)
 	md.mu.RUnlock()
@@ -68,7 +68,7 @@ func (s *Service) catchupProvider(ctx context.Context,
 			return
 		}
 	}
-	log.Info().Str("provider", provider).Int("provider_index", providerIndex).Msg("Caught up for provider")
+	log.Trace().Str("provider", provider).Int("provider_index", providerIndex).Msg("Caught up for provider")
 }
 
 func (s *Service) catchupProviderSlot(ctx context.Context,
