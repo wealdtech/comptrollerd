@@ -26,20 +26,30 @@ import (
 	"github.com/wealdtech/execd/services/execdb"
 )
 
-func (s *Service) catchup(ctx context.Context, md *metadata) {
-	// We find the latest slot for which we have a delivered bid.
-	bids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
-		Order: comptrollerdb.OrderLatest,
-		Limit: 1,
-	})
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to obtain latest delivered bid")
-	}
-	if len(bids) == 0 {
-		log.Debug().Msg("No delivered bids")
+func (s *Service) catchup(ctx context.Context, md *metadata, latestBidsSlot phase0.Slot) {
+	// We have the latest slot that has been processed by all relays.
+	if latestBidsSlot < phase0.Slot(s.trackDistance) {
+		log.Debug().Msg("Latest slot is less than track distance, not processing")
+
 		return
 	}
-	latestSlot := phase0.Slot(bids[0].Slot) - phase0.Slot(s.trackDistance)
+
+	// Calculate the slot we want to work up to given this information.
+	latestSlot := latestBidsSlot - phase0.Slot(s.trackDistance)
+
+	//	// We find the latest slot for which we have a delivered bid.
+	//	bids, err := s.deliveredBidsProvider.DeliveredBids(ctx, &comptrollerdb.DeliveredBidFilter{
+	//		Order: comptrollerdb.OrderLatest,
+	//		Limit: 1,
+	//	})
+	//	if err != nil {
+	//		log.Error().Err(err).Msg("Failed to obtain latest delivered bid")
+	//	}
+	//	if len(bids) == 0 {
+	//		log.Debug().Msg("No delivered bids")
+	//		return
+	//	}
+	//	latestSlot := phase0.Slot(bids[0].Slot) - phase0.Slot(s.trackDistance)
 
 	if md.LatestSlot >= int64(latestSlot) {
 		log.Trace().Msg("Up-to-date")

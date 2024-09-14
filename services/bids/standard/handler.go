@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,10 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	relayclient "github.com/attestantio/go-relay-client"
 	"github.com/pkg/errors"
 	"github.com/wealdtech/comptrollerd/services/comptrollerdb"
 	"go.opentelemetry.io/otel"
@@ -30,144 +28,174 @@ import (
 )
 
 func (s *Service) catchup(ctx context.Context, md *metadata) {
+	log.Info().Msg("Catching up")
 	// We fetch up to, but not including, the current slot.
-	currentSlot := s.chainTime.CurrentSlot()
-	for slot := phase0.Slot(md.LatestSlot + 1); slot < currentSlot; slot++ {
-		if err := s.catchupSlot(ctx, md, slot); err != nil {
-			log.Error().Uint64("slot", uint64(slot)).Err(err).Msg("Failed to catchup for slot")
+	var wg sync.WaitGroup
+	for i, provider := range s.receivedBidTracesProviders {
+		wg.Add(1)
+		go s.catchupProvider(ctx, &wg, md, provider.Name(), i)
+	}
+	wg.Wait()
+	log.Info().Msg("Caught up")
+}
+
+func (s *Service) catchupProvider(ctx context.Context,
+	wg *sync.WaitGroup,
+	md *metadata,
+	provider string,
+	providerIndex int,
+) {
+	defer wg.Done()
+
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.bids.standard").Start(ctx, "catchupProvider", trace.WithAttributes(
+		attribute.String("provider", provider),
+	))
+	defer span.End()
+
+	log.Info().Str("provider", provider).Int("provider_index", providerIndex).Msg("Catching up for provider")
+	md.mu.RLock()
+	firstSlot := phase0.Slot(md.LatestSlots[provider] + 1)
+	md.mu.RUnlock()
+	lastSlot := s.chainTime.CurrentSlot()
+	for slot := firstSlot; slot < lastSlot; slot++ {
+		if err := s.catchupProviderSlot(ctx, md, provider, providerIndex, slot); err != nil {
+			log.Error().
+				Uint64("slot", uint64(slot)).
+				Str("provider", provider).
+				Err(err).
+				Msg("Failed to catchup for provider slot")
+
 			return
 		}
 	}
+	log.Info().Str("provider", provider).Int("provider_index", providerIndex).Msg("Caught up for provider")
 }
 
-func (s *Service) catchupSlot(ctx context.Context, md *metadata, slot phase0.Slot) error {
-	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.bids.standard").Start(ctx, "catchupSlot", trace.WithAttributes(
-		attribute.Int64("slot", int64(slot)),
-	))
+func (s *Service) catchupProviderSlot(ctx context.Context,
+	md *metadata,
+	provider string,
+	providerIndex int,
+	slot phase0.Slot,
+) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.bids.standard").
+		Start(ctx, "catchupProviderSlot", trace.WithAttributes(
+			attribute.Int64("slot", int64(slot)),
+		))
 	defer span.End()
 
 	log := log.With().Uint64("slot", uint64(slot)).Logger()
 	log.Trace().Msg("Handling slot")
 
-	// We need to keep a version of the context unencumbered by a transaction for handlers,
-	// so scope the piece where the transaction lives.
-	{
-		ctx, cancel, err := s.receivedBidsSetter.BeginTx(ctx)
-		if err != nil {
-			return errors.Wrap(err, "failed to begin transaction")
-		}
+	opCtx, cancel, err := s.receivedBidsSetter.BeginTx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transaction")
+	}
 
-		if err := s.handleSlot(ctx, slot); err != nil {
-			cancel()
-			return errors.Wrap(err, "failed to handle slot")
-		}
+	if err := s.handleSlot(opCtx, provider, providerIndex, slot); err != nil {
+		cancel()
+		return errors.Wrap(err, "failed to handle slot")
+	}
 
-		md.LatestSlot = int64(slot)
-		if err := s.setMetadata(ctx, md); err != nil {
-			cancel()
-			return errors.Wrap(err, "failed to set metadata")
-		}
+	md.mu.Lock()
+	md.LatestSlots[provider] = int64(slot)
+	md.mu.Unlock()
 
-		if err := s.receivedBidsSetter.CommitTx(ctx); err != nil {
-			cancel()
-			return errors.Wrap(err, "failed to commit transaction")
-		}
+	md.mu.RLock()
+	if err := s.setMetadata(opCtx, md); err != nil {
+		md.mu.RUnlock()
+		cancel()
+		return errors.Wrap(err, "failed to set metadata")
+	}
+	md.mu.RUnlock()
+
+	if err := s.receivedBidsSetter.CommitTx(opCtx); err != nil {
+		cancel()
+		return errors.Wrap(err, "failed to commit transaction")
 	}
 
 	for _, relay := range s.receivedBidTracesProviders {
-		monitorRelayUpdated(relay.Address())
+		monitorRelayUpdated(relay.Name())
 	}
 	for _, relay := range s.deliveredBidTraceProviders {
-		monitorRelayUpdated(relay.Address())
+		monitorRelayUpdated(relay.Name())
 	}
 
-	for _, handler := range s.bidsReceivedHandlers {
-		log.Trace().Msg("Notifying handler")
-		go handler.BidsReceived(ctx, slot)
+	if len(s.bidsReceivedHandlers) > 0 {
+		// We need to pass the lowest slot of all of the providers, to ensure that we dont miss data.
+		lowestSlot := slot
+		md.mu.RLock()
+		for _, latestSlot := range md.LatestSlots {
+			if phase0.Slot(latestSlot) < lowestSlot {
+				lowestSlot = phase0.Slot(latestSlot)
+			}
+		}
+		md.mu.RUnlock()
+
+		log.Trace().
+			Uint64("lowest_completed_slot", uint64(lowestSlot)).
+			Int("handlers", len(s.bidsReceivedHandlers)).
+			Msg("Notifying handlers")
+		for _, handler := range s.bidsReceivedHandlers {
+			go handler.BidsReceived(ctx, lowestSlot)
+		}
 	}
 
 	return nil
 }
 
-func (s *Service) handleSlot(ctx context.Context, slot phase0.Slot) error {
-	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.bids.standard").Start(ctx, "handleSlot", trace.WithAttributes(
-		attribute.Int64("slot", int64(slot)),
-	))
+func (s *Service) handleSlot(ctx context.Context,
+	provider string,
+	providerIndex int,
+	slot phase0.Slot,
+) error {
+	ctx, span := otel.Tracer("wealdtech.comptrollerd.services.bids.standard").Start(ctx, "handleSlot")
 	defer span.End()
 
-	if err := s.handleReceivedBids(ctx, slot); err != nil {
+	if err := s.handleReceivedBids(ctx, provider, providerIndex, slot); err != nil {
 		return errors.Wrap(err, "failed to handle received bids")
 	}
-	if err := s.handleDeliveredBids(ctx, slot); err != nil {
-		return errors.Wrap(err, "failed to handle delivered bids")
+	if err := s.handleDeliveredBids(ctx, provider, providerIndex, slot); err != nil {
+		return errors.Wrap(err, "failed to handle delivered bid")
 	}
 
 	return nil
 }
 
-func (s *Service) handleReceivedBids(ctx context.Context, slot phase0.Slot) error {
-	var wg sync.WaitGroup
-	errs := int32(0)
+func (s *Service) handleReceivedBids(ctx context.Context,
+	provider string,
+	providerIndex int,
+	slot phase0.Slot,
+) error {
 	bids := make([]*comptrollerdb.ReceivedBid, 0)
-	bidsMu := sync.Mutex{}
-	for _, provider := range s.receivedBidTracesProviders {
-		wg.Add(1)
-		go func(ctx context.Context,
-			wg *sync.WaitGroup,
-			provider relayclient.ReceivedBidTracesProvider,
-			bidsMu *sync.Mutex,
-		) {
-			defer wg.Done()
-			traces, err := provider.ReceivedBidTraces(ctx, slot)
-			if err != nil {
-				log.Error().
-					Str("provider", provider.Address()).
-					Uint64("slot", uint64(slot)).
-					Err(err).
-					Msg("Failed to obtain received bid traces")
-				atomic.AddInt32(&errs, 1)
 
-				return
-			}
-			data, err := json.Marshal(traces)
-			if err != nil {
-				log.Error().
-					Str("provider", provider.Address()).
-					Uint64("slot", uint64(slot)).
-					Err(err).
-					Msg("Failed to unmarshal received bid traces")
-				atomic.AddInt32(&errs, 1)
-
-				return
-			}
-			log.Trace().
-				Str("provider", provider.Address()).
-				Uint64("slot", uint64(slot)).
-				RawJSON("bid_traces", data).
-				Msg("Obtained received bid traces")
-
-			bidsMu.Lock()
-			for _, trace := range traces {
-				bids = append(bids, &comptrollerdb.ReceivedBid{
-					Slot:                 uint32(trace.Slot),
-					Relay:                provider.Address(),
-					ParentHash:           trace.ParentHash[:],
-					BlockHash:            trace.BlockHash[:],
-					BuilderPubkey:        trace.BuilderPubkey[:],
-					Timestamp:            trace.Timestamp,
-					ProposerPubkey:       trace.ProposerPubkey[:],
-					ProposerFeeRecipient: trace.ProposerFeeRecipient[:],
-					GasLimit:             trace.GasLimit,
-					GasUsed:              trace.GasUsed,
-					Value:                trace.Value,
-				})
-			}
-			bidsMu.Unlock()
-		}(ctx, &wg, provider, &bidsMu)
+	bidTraces, err := s.receivedBidTracesProviders[providerIndex].ReceivedBidTraces(ctx, slot)
+	if err != nil {
+		return errors.Wrap(err, "failed to obtain received bid traces")
 	}
-	wg.Wait()
-	if errs > 0 {
-		return errors.New("failed to handle slot")
+	data, err := json.Marshal(bidTraces)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal received bid traces")
+	}
+	log.Trace().
+		Str("provider", provider).
+		Uint64("slot", uint64(slot)).
+		RawJSON("bid_traces", data).
+		Msg("Obtained received bid traces")
+
+	for _, bidTrace := range bidTraces {
+		bids = append(bids, &comptrollerdb.ReceivedBid{
+			Slot:                 uint32(bidTrace.Slot),
+			Relay:                provider,
+			ParentHash:           bidTrace.ParentHash[:],
+			BlockHash:            bidTrace.BlockHash[:],
+			BuilderPubkey:        bidTrace.BuilderPubkey[:],
+			Timestamp:            bidTrace.Timestamp,
+			ProposerPubkey:       bidTrace.ProposerPubkey[:],
+			ProposerFeeRecipient: bidTrace.ProposerFeeRecipient[:],
+			GasLimit:             bidTrace.GasLimit,
+			GasUsed:              bidTrace.GasUsed,
+			Value:                bidTrace.Value,
+		})
 	}
 
 	// Some relays return multiple copies of the same bid, so filter them out.
@@ -195,75 +223,46 @@ func (s *Service) handleReceivedBids(ctx context.Context, slot phase0.Slot) erro
 	return nil
 }
 
-func (s *Service) handleDeliveredBids(ctx context.Context, slot phase0.Slot) error {
-	var wg sync.WaitGroup
-	errs := int32(0)
+func (s *Service) handleDeliveredBids(ctx context.Context,
+	provider string,
+	providerIndex int,
+	slot phase0.Slot,
+) error {
 	bids := make([]*comptrollerdb.DeliveredBid, 0)
-	bidsMu := sync.Mutex{}
-	for _, provider := range s.deliveredBidTraceProviders {
-		wg.Add(1)
-		go func(ctx context.Context,
-			wg *sync.WaitGroup,
-			provider relayclient.DeliveredBidTraceProvider,
-			bidsMu *sync.Mutex,
-		) {
-			defer wg.Done()
-			trace, err := provider.DeliveredBidTrace(ctx, slot)
-			if err != nil {
-				log.Error().
-					Str("provider", provider.Address()).
-					Uint64("slot", uint64(slot)).
-					Err(err).
-					Msg("Failed to obtain delivered bid trace")
-				atomic.AddInt32(&errs, 1)
-
-				return
-			}
-			if trace == nil {
-				log.Trace().
-					Str("provider", provider.Address()).
-					Uint64("slot", uint64(slot)).
-					Msg("No delivered bid trace")
-
-				return
-			}
-			data, err := json.Marshal(trace)
-			if err != nil {
-				log.Error().
-					Str("provider", provider.Address()).
-					Uint64("slot", uint64(slot)).
-					Err(err).
-					Msg("Failed to unmarshal delivered bid trace")
-				atomic.AddInt32(&errs, 1)
-
-				return
-			}
-			log.Trace().
-				Str("provider", provider.Address()).
-				Uint64("slot", uint64(slot)).
-				RawJSON("bid_trace", data).
-				Msg("Obtained delivered bid trace")
-
-			bidsMu.Lock()
-			bids = append(bids, &comptrollerdb.DeliveredBid{
-				Slot:                 uint32(trace.Slot),
-				Relay:                provider.Address(),
-				ParentHash:           trace.ParentHash[:],
-				BlockHash:            trace.BlockHash[:],
-				BuilderPubkey:        trace.BuilderPubkey[:],
-				ProposerPubkey:       trace.ProposerPubkey[:],
-				ProposerFeeRecipient: trace.ProposerFeeRecipient[:],
-				GasLimit:             trace.GasLimit,
-				GasUsed:              trace.GasUsed,
-				Value:                trace.Value,
-			})
-			bidsMu.Unlock()
-		}(ctx, &wg, provider, &bidsMu)
+	bidTrace, err := s.deliveredBidTraceProviders[providerIndex].DeliveredBidTrace(ctx, slot)
+	if err != nil {
+		return errors.Wrap(err, "failed to obtain delivered bid trace")
 	}
-	wg.Wait()
-	if errs > 0 {
-		return errors.New("failed to handle slot")
+	if bidTrace == nil {
+		log.Trace().
+			Str("provider", provider).
+			Uint64("slot", uint64(slot)).
+			Msg("No delivered bid trace")
+
+		return nil
 	}
+	data, err := json.Marshal(bidTrace)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal delivered bid trace")
+	}
+	log.Trace().
+		Str("provider", provider).
+		Uint64("slot", uint64(slot)).
+		RawJSON("bid_trace", data).
+		Msg("Obtained delivered bid trace")
+
+	bids = append(bids, &comptrollerdb.DeliveredBid{
+		Slot:                 uint32(bidTrace.Slot),
+		Relay:                provider,
+		ParentHash:           bidTrace.ParentHash[:],
+		BlockHash:            bidTrace.BlockHash[:],
+		BuilderPubkey:        bidTrace.BuilderPubkey[:],
+		ProposerPubkey:       bidTrace.ProposerPubkey[:],
+		ProposerFeeRecipient: bidTrace.ProposerFeeRecipient[:],
+		GasLimit:             bidTrace.GasLimit,
+		GasUsed:              bidTrace.GasUsed,
+		Value:                bidTrace.Value,
+	})
 
 	for _, bid := range bids {
 		if err := s.deliveredBidsSetter.SetDeliveredBid(ctx, bid); err != nil {

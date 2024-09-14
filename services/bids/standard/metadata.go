@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2024 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,13 +16,18 @@ package standard
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/pkg/errors"
 )
 
 // metadata stored about this service.
 type metadata struct {
-	LatestSlot int64 `json:"latest_slot"`
+	// mu controls access to the metadata.
+	mu          sync.RWMutex
+	LatestSlots map[string]int64 `json:"latest_slots"`
+	// LatestSlot is deprecated.
+	LatestSlot int64 `json:"latest_slot,omitempty"`
 }
 
 // metadataKey is the key for the metadata.
@@ -31,7 +36,7 @@ var metadataKey = "bids.standard"
 // getMetadata gets metadata for this service.
 func (s *Service) getMetadata(ctx context.Context) (*metadata, error) {
 	md := &metadata{
-		LatestSlot: -1,
+		LatestSlots: make(map[string]int64),
 	}
 	mdJSON, err := s.receivedBidsSetter.Metadata(ctx, metadataKey)
 	if err != nil {
@@ -42,6 +47,14 @@ func (s *Service) getMetadata(ctx context.Context) (*metadata, error) {
 	}
 	if err := json.Unmarshal(mdJSON, md); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal metadata")
+	}
+
+	if len(md.LatestSlots) == 0 {
+		// Upgrade.
+		for _, provider := range s.receivedBidTracesProviders {
+			md.LatestSlots[provider.Name()] = md.LatestSlot
+		}
+		md.LatestSlot = 0
 	}
 
 	return md, nil

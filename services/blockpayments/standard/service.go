@@ -137,7 +137,7 @@ func (s *Service) onStart(ctx context.Context,
 }
 
 // BidsReceived is called whenever the bids for a given slot have been obtained.
-func (s *Service) BidsReceived(ctx context.Context, _ phase0.Slot) {
+func (s *Service) BidsReceived(ctx context.Context, slot phase0.Slot) {
 	// Only allow 1 handler to be active.
 	acquired := s.activitySem.TryAcquire(1)
 	if !acquired {
@@ -152,5 +152,5 @@ func (s *Service) BidsReceived(ctx context.Context, _ phase0.Slot) {
 		return
 	}
 
-	s.catchup(ctx, md)
+	s.catchup(ctx, md, slot)
 }
