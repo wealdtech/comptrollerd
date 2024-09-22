@@ -51,7 +51,7 @@ import (
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.3.2"
+var ReleaseVersion = "0.4.0"
 
 func main() {
 	os.Exit(main2())
@@ -288,14 +288,30 @@ func startRelays(
 	schedulerSvc scheduler.Service,
 ) error {
 	queuedProposerProviders := make([]relayclient.QueuedProposersProvider, 0)
+	// Old-style configuration.
 	for _, relayAddress := range viper.GetStringSlice("relays.addresses") {
-		relayClient, err := util.FetchRelayClient(ctx, relayAddress)
+		timeout := util.Timeout("relayclient")
+		logLevel := util.LogLevel("relayclient")
+		relayClient, err := util.FetchRelayClient(ctx, "", relayAddress, timeout, logLevel)
 		if err != nil {
 			log.Error().Str("address", relayAddress).Err(err).Msg("Failed to instantiate relay client; skipping")
 			continue
 		}
 		queuedProposerProviders = append(queuedProposerProviders, relayClient.(relayclient.QueuedProposersProvider))
 	}
+	// New-style configuration.
+	for name := range viper.GetStringMap("relays") {
+		address := viper.GetString(fmt.Sprintf("relays.%s.address", name))
+		timeout := util.Timeout(fmt.Sprintf("relays.%s", name))
+		logLevel := util.LogLevel(fmt.Sprintf("relays.%s", name))
+		relayClient, err := util.FetchRelayClient(ctx, name, address, timeout, logLevel)
+		if err != nil {
+			log.Error().Str("name", name).Str("address", address).Err(err).Msg("Failed to instantiate relay client; skipping")
+			continue
+		}
+		queuedProposerProviders = append(queuedProposerProviders, relayClient.(relayclient.QueuedProposersProvider))
+	}
+
 	_, err := standardrelays.New(ctx,
 		standardrelays.WithLogLevel(util.LogLevel("relays")),
 		standardrelays.WithMonitor(monitor),
@@ -341,21 +357,30 @@ func startBids(
 	}
 
 	receivedBidTracesProviders := make([]relayclient.ReceivedBidTracesProvider, 0)
+	deliveredBidTraceProviders := make([]relayclient.DeliveredBidTraceProvider, 0)
+	// Old-style configuration.
 	for _, relayAddress := range viper.GetStringSlice("bids.addresses") {
-		relayClient, err := util.FetchRelayClient(ctx, relayAddress)
+		timeout := util.Timeout("relayclient")
+		logLevel := util.LogLevel("relayclient")
+		relayClient, err := util.FetchRelayClient(ctx, "", relayAddress, timeout, logLevel)
 		if err != nil {
 			log.Error().Str("address", relayAddress).Err(err).Msg("Failed to instantiate relay client; skipping")
 			continue
 		}
 		receivedBidTracesProviders = append(receivedBidTracesProviders, relayClient.(relayclient.ReceivedBidTracesProvider))
+		deliveredBidTraceProviders = append(deliveredBidTraceProviders, relayClient.(relayclient.DeliveredBidTraceProvider))
 	}
-	deliveredBidTraceProviders := make([]relayclient.DeliveredBidTraceProvider, 0)
-	for _, relayAddress := range viper.GetStringSlice("bids.addresses") {
-		relayClient, err := util.FetchRelayClient(ctx, relayAddress)
+	// New-style configuration.
+	for name := range viper.GetStringMap("relays") {
+		address := viper.GetString(fmt.Sprintf("relays.%s.address", name))
+		timeout := util.Timeout(fmt.Sprintf("relays.%s", name))
+		logLevel := util.LogLevel(fmt.Sprintf("relays.%s", name))
+		relayClient, err := util.FetchRelayClient(ctx, name, address, timeout, logLevel)
 		if err != nil {
-			log.Error().Str("address", relayAddress).Err(err).Msg("Failed to instantiate relay client; skipping")
+			log.Error().Str("name", name).Str("address", address).Err(err).Msg("Failed to instantiate relay client; skipping")
 			continue
 		}
+		receivedBidTracesProviders = append(receivedBidTracesProviders, relayClient.(relayclient.ReceivedBidTracesProvider))
 		deliveredBidTraceProviders = append(deliveredBidTraceProviders, relayClient.(relayclient.DeliveredBidTraceProvider))
 	}
 	if _, err := standardbids.New(ctx,

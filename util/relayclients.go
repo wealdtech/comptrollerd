@@ -16,11 +16,12 @@ package util
 import (
 	"context"
 	"sync"
+	"time"
 
 	relayclient "github.com/attestantio/go-relay-client"
 	httprelayclient "github.com/attestantio/go-relay-client/http"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -29,7 +30,15 @@ var (
 )
 
 // FetchRelayClient fetches a relay client service, instantiating it if required.
-func FetchRelayClient(ctx context.Context, address string) (relayclient.Service, error) {
+func FetchRelayClient(ctx context.Context,
+	name string,
+	address string,
+	timeout time.Duration,
+	logLevel zerolog.Level,
+) (
+	relayclient.Service,
+	error,
+) {
 	relayClientsMu.Lock()
 	defer relayClientsMu.Unlock()
 	if relayClients == nil {
@@ -41,9 +50,11 @@ func FetchRelayClient(ctx context.Context, address string) (relayclient.Service,
 	if client, exists = relayClients[address]; !exists {
 		var err error
 		client, err = httprelayclient.New(ctx,
-			httprelayclient.WithLogLevel(LogLevel("relayclient")),
-			httprelayclient.WithTimeout(viper.GetDuration("relayclient.timeout")),
-			httprelayclient.WithAddress(address))
+			httprelayclient.WithLogLevel(logLevel),
+			httprelayclient.WithTimeout(timeout),
+			httprelayclient.WithName(name),
+			httprelayclient.WithAddress(address),
+		)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initiate relay client")
 		}

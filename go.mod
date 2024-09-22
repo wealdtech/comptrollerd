@@ -7,7 +7,7 @@ toolchain go1.22.2
 require (
 	github.com/attestantio/go-eth2-client v0.21.11
 	github.com/attestantio/go-execution-client v0.9.2
-	github.com/attestantio/go-relay-client v0.2.5
+	github.com/attestantio/go-relay-client v0.2.6
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
 	github.com/jackc/pgx-zerolog v0.0.0-20230315001418-f978528409eb
@@ -51,7 +51,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goccy/go-yaml v1.9.2 // indirect
+	github.com/goccy/go-yaml v1.11.3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect

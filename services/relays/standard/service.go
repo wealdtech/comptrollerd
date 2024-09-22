@@ -96,27 +96,27 @@ func (s *Service) updateOnScheduleTick(ctx context.Context, _ any) {
 
 func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 	for _, provider := range s.queuedProposersProviders {
-		log := log.With().Str("relay", provider.Address()).Logger()
+		log := log.With().Str("relay", provider.Name()).Logger()
 		proposers, err := provider.QueuedProposers(ctx)
 		if err != nil {
 			log.Warn().Err(err).Msg("Failed to obtain queued proposers for update")
-			monitorRelayActive(provider.Address(), false)
+			monitorRelayActive(provider.Name(), false)
 			continue
 		}
 		if len(proposers) == 0 {
 			log.Trace().Msg("No proposers")
 			// We consider a provider with no proposers to be inactive.
-			monitorRelayActive(provider.Address(), false)
+			monitorRelayActive(provider.Name(), false)
 
 			continue
 		}
-		monitorRelayActive(provider.Address(), true)
+		monitorRelayActive(provider.Name(), true)
 
 		for _, proposer := range proposers {
 			slot := uint32(proposer.Slot)
 			// See if we already have this in the database.
 			filter := &comptrollerdb.ValidatorRegistrationFilter{
-				Relays:   []string{provider.Address()},
+				Relays:   []string{provider.Name()},
 				FromSlot: &slot,
 				ToSlot:   &slot,
 			}
@@ -133,7 +133,7 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 					Str("fee_recipient", fmt.Sprintf("%#x", registrations[0].FeeRecipient)).
 					Uint64("gas_limit", registrations[0].GasLimit).
 					Msg("Duplicate; ignoring")
-				monitorRegistrationsProcessed(provider.Address())
+				monitorRegistrationsProcessed(provider.Name())
 
 				continue
 			}
@@ -146,7 +146,7 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 
 			if err := s.validatorRegistrationsSetter.SetValidatorRegistration(ctx, &comptrollerdb.ValidatorRegistration{
 				Slot:            slot,
-				Relay:           provider.Address(),
+				Relay:           provider.Name(),
 				ValidatorPubkey: proposer.Entry.Message.Pubkey[:],
 				FeeRecipient:    proposer.Entry.Message.FeeRecipient[:],
 				GasLimit:        proposer.Entry.Message.GasLimit,
@@ -165,12 +165,12 @@ func (s *Service) updateQueuedProposersProviders(ctx context.Context) {
 				continue
 			}
 			log.Trace().
-				Str("relay", provider.Address()).
+				Str("relay", provider.Name()).
 				Uint64("slot", uint64(proposer.Slot)).
 				Stringer("pubkey", proposer.Entry.Message.Pubkey).
 				Stringer("fee_recipient", proposer.Entry.Message.FeeRecipient).
 				Msg("Stored validator registration")
-			monitorRegistrationsProcessed(provider.Address())
+			monitorRegistrationsProcessed(provider.Name())
 		}
 	}
 }
