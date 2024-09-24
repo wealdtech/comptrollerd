@@ -113,12 +113,7 @@ func (s *Service) catchupProviderSlot(ctx context.Context,
 		return errors.Wrap(err, "failed to commit transaction")
 	}
 
-	for _, relay := range s.receivedBidTracesProviders {
-		monitorRelayUpdated(relay.Name())
-	}
-	for _, relay := range s.deliveredBidTraceProviders {
-		monitorRelayUpdated(relay.Name())
-	}
+	monitorRelayUpdated(provider)
 
 	if len(s.bidsReceivedHandlers) > 0 {
 		// We need to pass the lowest slot of all of the providers, to ensure that we dont miss data.
