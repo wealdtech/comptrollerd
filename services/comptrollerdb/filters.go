@@ -161,6 +161,10 @@ type ReceivedBidFilter struct {
 	// ProposerFeeRecipients are the proposer fee recipients of the bids.
 	// If nil then there is no proposer fee recipient filter.
 	ProposerFeeRecipients [][]byte
+
+	// BlockHashes are the block hashes of the bids.
+	// If nil then there is no block hash filter.
+	BlockHashes [][]byte
 }
 
 // DeliveredBidFilter defines a filter for fetching delivered bids.
@@ -200,4 +204,8 @@ type DeliveredBidFilter struct {
 	// ProposerFeeRecipients are the proposer fee recipients of the bids.
 	// If nil then there is no proposer fee recipient filter.
 	ProposerFeeRecipients [][]byte
+
+	// BlockHashes are the block hashes of the bids.
+	// If nil then there is no block hash filter.
+	BlockHashes [][]byte
 }

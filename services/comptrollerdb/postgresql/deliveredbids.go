@@ -130,6 +130,13 @@ FROM t_delivered_bids`)
 		queryVals = append(queryVals, filter.ProposerPubkeys)
 		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_proposer_pubkey = ANY($%d)`, wherestr, len(queryVals)))
+		wherestr = "  AND"
+	}
+
+	if len(filter.BlockHashes) > 0 {
+		queryVals = append(queryVals, filter.BlockHashes)
+		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
+%s f_block_hash = ANY($%d)`, wherestr, len(queryVals)))
 		// wherestr = "  AND"
 	}
 
