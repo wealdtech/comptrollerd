@@ -56,9 +56,7 @@ jobs:
         run: git checkout ${{ github.ref_name }}
 
       - name: Fetch repository dependencies
-        run: go get -x -v -t ./...
-        env:
-          GIT_TRACE: true
+        run: go get -v -t ./...
 
       - name: Compile
         run: |
@@ -174,7 +172,7 @@ jobs:
           go-version: '^1.22'
 
       - name: Check out repository into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Select correct tag
         run: git checkout ${{ github.ref_name }}
