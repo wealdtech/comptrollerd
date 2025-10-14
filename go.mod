@@ -1,13 +1,13 @@
 module github.com/wealdtech/comptrollerd
 
-go 1.22.7
+go 1.23.0
 
-toolchain go1.23.2
+toolchain go1.24.5
 
 require (
-	github.com/attestantio/go-eth2-client v0.23.1
-	github.com/attestantio/go-execution-client v0.9.4
-	github.com/attestantio/go-relay-client v0.2.7
+	github.com/attestantio/go-eth2-client v0.27.1
+	github.com/attestantio/go-execution-client v0.10.2
+	github.com/attestantio/go-relay-client v0.3.0
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/jackc/pgx-shopspring-decimal v0.0.0-20220624020537-1d36b5a1853e
 	github.com/jackc/pgx-zerolog v0.0.0-20230315001418-f978528409eb
@@ -39,7 +39,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	cloud.google.com/go/iam v1.3.1 // indirect
 	cloud.google.com/go/secretmanager v1.14.4 // indirect
-	github.com/attestantio/go-builder-client v0.5.3 // indirect
+	github.com/attestantio/go-builder-client v0.7.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -94,7 +94,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
