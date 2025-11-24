@@ -137,7 +137,6 @@ FROM t_delivered_bids`)
 		queryVals = append(queryVals, filter.BlockHashes)
 		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_block_hash = ANY($%d)`, wherestr, len(queryVals)))
-		// wherestr = "  AND"
 	}
 
 	switch filter.Order {

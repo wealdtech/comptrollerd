@@ -405,7 +405,6 @@ func startBids(
 func runCommands(_ context.Context) {
 	if viper.GetBool("version") {
 		fmt.Fprintf(os.Stdout, "%s\n", ReleaseVersion)
-		//nolint:revive
 		os.Exit(0)
 	}
 }

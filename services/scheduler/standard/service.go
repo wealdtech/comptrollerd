@@ -370,8 +370,6 @@ func finaliseJob(job *job) {
 }
 
 // runJob runs the given job.
-//
-//nolint:revive
 func (*Service) runJob(_ context.Context, job *job) error {
 	job.stateLock.Lock()
 	if job.active.Load() {

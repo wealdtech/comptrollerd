@@ -83,10 +83,6 @@ type BlockPaymentFilter struct {
 	// ToSlot is the latest slot to which to fetch results.
 	// If nil then there is no latest slot.
 	ToSlot *uint32
-
-	// FeeRecipients are the fee recipients of the rewards.
-	// If nil then there is no fee recipient filter.
-	// FeeRecipients [][]byte
 }
 
 // ValidatorRegistrationFilter defines a filter for fetching validator registrations.

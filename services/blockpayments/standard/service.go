@@ -77,7 +77,6 @@ func New(ctx context.Context, params ...Parameter) (*Service, error) {
 		if err := s.onReplaySlot(ctx, phase0.Slot(parameters.replaySlot)); err != nil {
 			return nil, err
 		}
-		//nolint:revive
 		os.Exit(0)
 	}
 
