@@ -39,7 +39,6 @@ jobs:
           prerelease: false
 
   # Build and pack the binaries for linux.
-  # Build and pack the binaries for linux.
   build_linux:
     runs-on: ubuntu-22.04
     needs: [create_release, env_vars]
