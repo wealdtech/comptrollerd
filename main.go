@@ -51,7 +51,7 @@ import (
 )
 
 // ReleaseVersion is the release version for the code.
-var ReleaseVersion = "0.4.5"
+var ReleaseVersion = "0.5.0"
 
 func main() {
 	os.Exit(main2())
@@ -405,7 +405,6 @@ func startBids(
 func runCommands(_ context.Context) {
 	if viper.GetBool("version") {
 		fmt.Fprintf(os.Stdout, "%s\n", ReleaseVersion)
-		//nolint:revive
 		os.Exit(0)
 	}
 }

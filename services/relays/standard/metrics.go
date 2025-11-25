@@ -74,7 +74,6 @@ func monitorRegistrationsProcessed(relay string) {
 	}
 }
 
-//nolint:revive
 func monitorRelayActive(relay string, active bool) {
 	if relayActive != nil {
 		if active {

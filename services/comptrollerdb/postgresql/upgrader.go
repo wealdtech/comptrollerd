@@ -90,42 +90,6 @@ func (s *Service) Upgrade(ctx context.Context) error {
 	return nil
 }
 
-// // columnExists returns true if the given column exists in the given table.
-// func (s *Service) columnExists(ctx context.Context, tableName string, columnName string) (bool, error) {
-// 	tx := s.tx(ctx)
-// 	if tx == nil {
-// 		ctx, cancel, err := s.BeginTx(ctx)
-// 		if err != nil {
-// 			return false, errors.Wrap(err, "failed to begin transaction")
-// 		}
-// 		tx = s.tx(ctx)
-// 		defer cancel()
-// 	}
-//
-// 	query := fmt.Sprintf(`SELECT true
-// FROM pg_attribute
-// WHERE attrelid = '%s'::regclass
-//   AND attname = '%s'
-//   AND NOT attisdropped`, tableName, columnName)
-//
-// 	rows, err := tx.Query(ctx, query)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	defer rows.Close()
-//
-// 	found := false
-// 	if rows.Next() {
-// 		err = rows.Scan(
-// 			&found,
-// 		)
-// 		if err != nil {
-// 			return false, errors.Wrap(err, "failed to scan row")
-// 		}
-// 	}
-// 	return found, nil
-// }
-
 // tableExists returns true if the given table exists.
 func (s *Service) tableExists(ctx context.Context, tableName string) (bool, error) {
 	tx := s.tx(ctx)

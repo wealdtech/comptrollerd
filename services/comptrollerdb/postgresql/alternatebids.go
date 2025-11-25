@@ -110,7 +110,6 @@ FROM t_alternate_bids`)
 		queryVals = append(queryVals, filter.BestRelays)
 		_, _ = queryBuilder.WriteString(fmt.Sprintf(`
 %s f_best_relay = ANY($%d)`, wherestr, len(queryVals)))
-		// wherestr = "  AND"
 	}
 
 	switch filter.Order {

@@ -255,7 +255,6 @@ func (s *Service) checkUnderpaidBid(ctx context.Context,
 	return nil
 }
 
-//nolint:revive
 func (s *Service) calcBuilderRewards(ctx context.Context,
 	block *execdb.Block,
 	txs []*execdb.Transaction,
@@ -511,6 +510,7 @@ func (s *Service) deliveredBidOfSlot(ctx context.Context,
 	deliveredBid := deliveredBids[0]
 
 	if e := log.Trace(); e.Enabled() {
+		//nolint:musttag
 		rawJSON, err := json.Marshal(deliveredBid)
 		if err == nil {
 			e.RawJSON("delivered_bid", rawJSON).Msg("Obtained delivered bid")
