@@ -546,6 +546,7 @@ func TestCatchupProviderSlot_WithHandlers(t *testing.T) {
 	mockDeliveredBidTraceProvider.EXPECT().DeliveredBidTrace(mock.Anything, slot).Return(nil, nil)
 	mockReceivedBidsSetter.EXPECT().SetMetadata(mock.Anything, metadataKey, mock.Anything).Return(nil)
 	mockReceivedBidsSetter.EXPECT().CommitTx(mock.Anything).Return(nil)
+	mockHandler.EXPECT().BidsReceived(mock.Anything, slot).Maybe()
 
 	md := &metadata{
 		LatestSlots: map[string]int64{provider: int64(slot)},
