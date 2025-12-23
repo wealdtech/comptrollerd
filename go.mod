@@ -86,6 +86,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/ybbus/jsonrpc/v2 v2.1.7 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

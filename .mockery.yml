@@ -1,0 +1,34 @@
+all: false
+dir: "mocks/{{.SrcPackageName}}"
+pkgname: "mocks"
+filename: "mock_{{.InterfaceName}}.go"
+structname: "{{.Mock}}{{.InterfaceName}}"
+
+force-file-write: true
+formatter: goimports
+generate: true
+include-auto-generated: false
+log-level: info
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: "{{.Template}}.schema.json"
+
+packages:
+  github.com/wealdtech/comptrollerd/services/comptrollerdb:
+    interfaces:
+      ReceivedBidsSetter:
+      DeliveredBidsSetter:
+  github.com/wealdtech/comptrollerd/services/scheduler:
+    interfaces:
+      Service:
+  github.com/wealdtech/comptrollerd/services/chaintime:
+    interfaces:
+      Service:
+  github.com/wealdtech/comptrollerd/services/bids:
+    interfaces:
+      ReceivedHandler:
+  github.com/attestantio/go-relay-client:
+    interfaces:
+      ReceivedBidTracesProvider:
+      DeliveredBidTraceProvider:
