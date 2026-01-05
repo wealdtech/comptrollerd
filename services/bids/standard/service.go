@@ -1,4 +1,4 @@
-// Copyright © 2022 Weald Technology Trading.
+// Copyright © 2022, 2026 Weald Technology Trading.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -84,8 +84,12 @@ func (s *Service) onStart(ctx context.Context,
 	if err != nil {
 		return errors.Wrap(err, "failed to obtain metadata")
 	}
+
 	if startSlot >= 0 {
-		md.LatestSlot = startSlot - 1
+		err := s.updateStartSlot(ctx, md, startSlot)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Trace().Msg("Running initial catchup")
@@ -105,6 +109,34 @@ func (s *Service) onStart(ctx context.Context,
 		nil,
 	); err != nil {
 		return errors.Wrap(err, "failed to schedule bid updates")
+	}
+
+	return nil
+}
+
+func (s *Service) updateStartSlot(ctx context.Context, md *metadata, startSlot int64) error {
+	md.mu.Lock()
+	defer md.mu.Unlock()
+
+	opCtx, cancel, err := s.receivedBidsSetter.BeginTx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transaction for metadata update")
+	}
+
+	for _, prov := range s.receivedBidTracesProviders {
+		name := prov.Name()
+		if cur, ok := md.LatestSlots[name]; !ok || cur < startSlot-1 {
+			md.LatestSlots[name] = startSlot - 1
+		}
+	}
+
+	if err := s.setMetadata(ctx, md); err != nil {
+		return errors.Wrap(err, "failed to set metadata")
+	}
+
+	if err := s.receivedBidsSetter.CommitTx(opCtx); err != nil {
+		cancel()
+		return errors.Wrap(err, "failed to commit metadata transaction")
 	}
 
 	return nil
