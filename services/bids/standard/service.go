@@ -86,7 +86,7 @@ func (s *Service) onStart(ctx context.Context,
 	}
 
 	if startSlot >= 0 {
-		err := updateStartSlot(ctx, s, md, startSlot)
+		err := s.updateStartSlot(ctx, md, startSlot)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (s *Service) onStart(ctx context.Context,
 	return nil
 }
 
-func updateStartSlot(ctx context.Context, s *Service, md *metadata, startSlot int64) error {
+func (s *Service) updateStartSlot(ctx context.Context, md *metadata, startSlot int64) error {
 	md.mu.Lock()
 	defer md.mu.Unlock()
 
